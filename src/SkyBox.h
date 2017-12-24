@@ -53,7 +53,6 @@ class SkyBox
     void init();
     void render(const TCamera& camera);
     
-    //void addCubemap( TextureCubemap *cubemap );
     void addCubemap( const std::string &name );
     bool setCubemap( size_t idx );
     

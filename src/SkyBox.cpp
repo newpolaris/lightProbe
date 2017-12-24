@@ -118,14 +118,6 @@ void SkyBox::addCubemap( const std::string &name )
   m_cubemaps.push_back( cubemap );
 }
 
-/*
-void SkyBox::addCubemap( TextureCubemap *cubemap )
-{
-  assert( m_bInitialized && (0 != cubemap) );
-  m_cubemaps.push_back( cubemap );
-}
-*/
-
 bool SkyBox::setCubemap( size_t idx )
 {
   assert( m_bInitialized );

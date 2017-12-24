@@ -71,17 +71,11 @@ namespace
 	SkyBox m_skybox;
 	Skydome m_skydome;
 
-	float coeffs[9][3] ;                /* Spherical harmonic coefficients */
-	glm::mat4 matrix[3] ;               /* Matrix for quadratic form */
-
     //~
 
     TCamera camera;
 
-    // App app;
-
     bool bWireframe = false;
-    bool bFullscreen = false;
 
     //~
 
@@ -138,6 +132,7 @@ namespace {
 		// OpenGL
 		initGL();
 
+		// ImGui initialize without callbacks
 		ImGui_ImplGlfwGL3_Init(window, false);
 
 		// Load FontsR
@@ -160,9 +155,7 @@ namespace {
         camera.setMoveCoefficient(0.35f);
 
         Timer::getInstance().start();
-        // Logger::getInstance().open("logfile");
 
-        // app.init( &camera ); 
 
         GLuint VertexArrayID;
         GL_ASSERT(glGenVertexArrays(1, &VertexArrayID));
@@ -177,25 +170,13 @@ namespace {
 
 		m_texture = std::make_shared<Texture2D>();
         m_texture->initialize();
-#if 0
-        m_texture->load("resource/skydome/021.jpg");
-#else
-		const int width = 1000;
-		ByteArray image = ReadFileSync( "resource/grace_probe.float" );
-		if (image.size() > 0) {
-			prefilter(reinterpret_cast<fRGB*>(image.data()), width, width);
-			tomatrix();
-			// printcoeffs();
-			m_texture->load(GL_RGB, width, width, GL_RGB, GL_FLOAT, image.data() );
-		}
-#endif
+
 		m_skybox.init();
-		// m_skybox.addCubemap( "resource/MountainPath/*.jpg" );
 		m_skybox.addCubemap( "resource/Cube/*.bmp" );
+	#if !_DEBUG
+		// m_skybox.addCubemap( "resource/MountainPath/*.jpg" );
+	#endif
 		m_skybox.setCubemap( 0u );
-		
-		// m_skydome.initialize();
-		// m_skydome.setTexture( m_texture );
 	}
 
 	void initExtension()
@@ -221,8 +202,8 @@ namespace {
 		}
 
         std::printf("%s\n%s\n", 
-                glGetString(GL_RENDERER),  // e.g. Intel HD Graphics 3000 OpenGL Engine
-                glGetString(GL_VERSION)    // e.g. 3.2 INTEL-8.0.61
+			glGetString(GL_RENDERER),  // e.g. Intel HD Graphics 3000 OpenGL Engine
+			glGetString(GL_VERSION)    // e.g. 3.2 INTEL-8.0.61
         );
 
         glClearColor( 0.15f, 0.15f, 0.15f, 0.0f);
@@ -255,7 +236,7 @@ namespace {
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
 		window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_NAME, NULL, NULL );
-		if( window == NULL ){
+		if ( window == NULL ) {
 			fprintf( stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n" );
 			glfwTerminate();
 			exit( EXIT_FAILURE );
@@ -300,185 +281,6 @@ namespace {
 	float sinc(float x) {               /* Supporting sinc function */
 		if (fabs(x) < 1.0e-4) return 1.0 ;
 		else return(sin(x)/x) ;
-	}
-
-	// eq (10)
-	void prefilter(fRGB* im, int width, int height)
-	{
-		/* The main integration routine.  Of course, there are better ways
-		   to do quadrature but this suffices.  Calls updatecoeffs to
-		   actually increment the integral. Width is the size of the
-		   environment map */
-		const float PI = 3.141529f;
-
-		int i,j ;
-		for (i = 0 ; i < height; i++) {
-			for (j = 0 ; j < width ; j++) {
-
-				/* We now find the cartesian components for the point (i,j) */
-				float u,v,r,theta,phi,x,y,z,domega ;
-
-				// from image 'http://www.pauldebevec.com/Probes/'
-				v = (height/2.0 - i)/(height/2.0);  /* v ranges from -1 to 1 */
-				u = (j-width/2.0)/(width/2.0);      /* u ranges from -1 to 1 */
-				r = sqrt(u*u+v*v) ;                 /* The "radius" */
-				if (r > 1.0) continue ;             /* Consider only circle with r<1 */
-
-				theta = PI*r ;                      /* theta parameter of (i,j) */
-				phi = atan2(v,u) ;                  /* phi parameter */
-
-				x = sin(theta)*cos(phi) ;           /* Cartesian components */
-				y = sin(theta)*sin(phi) ;
-				z = cos(theta) ;
-
-				/* Computation of the solid angle.  This follows from some
-				   elementary calculus converting eq(10)'s sin(theta) d theta d phi into
-				   coordinates in terms of r.  This calculation should be redone 
-				   if the form of the input changes */
-
-				domega = (2*PI/height)*(2*PI/width)*sinc(theta) ;
-
-				updatecoeffs((float*)(im + width*i + j),domega,x,y,z) ; /* Update Integration */
-			}
-		}
-	}
-
-	void printcoeffs()
-	{
-		int i, j;
-		/* Output Results */
-
-		printf("\n         Lighting Coefficients\n\n") ;
-		printf("(l,m)       RED        GREEN     BLUE\n") ;
-
-		printf("L_{0,0}   %9.6f %9.6f %9.6f\n",
-				coeffs[0][0],coeffs[0][1],coeffs[0][2]) ;
-		printf("L_{1,-1}  %9.6f %9.6f %9.6f\n",
-				coeffs[1][0],coeffs[1][1],coeffs[1][2]) ;
-		printf("L_{1,0}   %9.6f %9.6f %9.6f\n",
-				coeffs[2][0],coeffs[2][1],coeffs[2][2]) ;
-		printf("L_{1,1}   %9.6f %9.6f %9.6f\n",
-				coeffs[3][0],coeffs[3][1],coeffs[3][2]) ;
-		printf("L_{2,-2}  %9.6f %9.6f %9.6f\n",
-				coeffs[4][0],coeffs[4][1],coeffs[4][2]) ;
-		printf("L_{2,-1}  %9.6f %9.6f %9.6f\n",
-				coeffs[5][0],coeffs[5][1],coeffs[5][2]) ;
-		printf("L_{2,0}   %9.6f %9.6f %9.6f\n",
-				coeffs[6][0],coeffs[6][1],coeffs[6][2]) ;
-		printf("L_{2,1}   %9.6f %9.6f %9.6f\n",
-				coeffs[7][0],coeffs[7][1],coeffs[7][2]) ;
-		printf("L_{2,2}   %9.6f %9.6f %9.6f\n",
-				coeffs[8][0],coeffs[8][1],coeffs[8][2]) ;
-
-		printf("\nMATRIX M: RED\n") ;
-		for (i = 0 ; i < 4 ; i++) {
-			for (j = 0 ; j < 4 ; j++)
-				printf("%9.6f ",matrix[0][i][j]) ;
-			printf("\n") ;
-		}
-		printf("\nMATRIX M: GREEN\n") ;
-		for (i = 0 ; i < 4 ; i++) {
-			for (j = 0 ; j < 4 ; j++)
-				printf("%9.6f ",matrix[1][i][j]) ;
-			printf("\n") ;
-		}
-		printf("\nMATRIX M: BLUE\n") ;
-		for (i = 0 ; i < 4 ; i++) {
-			for (j = 0 ; j < 4 ; j++)
-				printf("%9.6f ",matrix[2][i][j]) ;
-			printf("\n") ;
-		}
-
-	}
-
-	void tomatrix(void) {
-
-		/* Form the quadratic form matrix (see equations 11 and 12 in paper) */
-
-		int col ;
-		float c1,c2,c3,c4,c5 ;
-		c1 = 0.429043 ; c2 = 0.511664 ;
-		c3 = 0.743125 ; c4 = 0.886227 ; c5 = 0.247708 ;
-
-		for (col = 0 ; col < 3 ; col++) { /* Equation 12 */
-
-			matrix[col][0][0] = c1*coeffs[8][col] ; /* c1 L_{22}  */
-			matrix[col][0][1] = c1*coeffs[4][col] ; /* c1 L_{2-2} */
-			matrix[col][0][2] = c1*coeffs[7][col] ; /* c1 L_{21}  */
-			matrix[col][0][3] = c2*coeffs[3][col] ; /* c2 L_{11}  */
-
-			matrix[col][1][0] = c1*coeffs[4][col] ; /* c1 L_{2-2} */
-			matrix[col][1][1] = -c1*coeffs[8][col]; /*-c1 L_{22}  */
-			matrix[col][1][2] = c1*coeffs[5][col] ; /* c1 L_{2-1} */
-			matrix[col][1][3] = c2*coeffs[1][col] ; /* c2 L_{1-1} */
-
-			matrix[col][2][0] = c1*coeffs[7][col] ; /* c1 L_{21}  */
-			matrix[col][2][1] = c1*coeffs[5][col] ; /* c1 L_{2-1} */
-			matrix[col][2][2] = c3*coeffs[6][col] ; /* c3 L_{20}  */
-			matrix[col][2][3] = c2*coeffs[2][col] ; /* c2 L_{10}  */
-
-			matrix[col][3][0] = c2*coeffs[3][col] ; /* c2 L_{11}  */
-			matrix[col][3][1] = c2*coeffs[1][col] ; /* c2 L_{1-1} */
-			matrix[col][3][2] = c2*coeffs[2][col] ; /* c2 L_{10}  */
-			matrix[col][3][3] = c4*coeffs[0][col] - c5*coeffs[6][col] ; 
-			/* c4 L_{00} - c5 L_{20} */
-		}
-	}
-
-
-	void updatecoeffs(float hdr[3], float domega, float x, float y, float z) 
-	{ 
-
-		/****************************************************************** 
-		  Update the coefficients (i.e. compute the next term in the
-		  integral) based on the lighting value hdr[3], the differential
-		  solid angle domega and cartesian components of surface normal x,y,z
-
-		  Inputs:  hdr = L(x,y,z) [note that x^2+y^2+z^2 = 1]
-		  i.e. the illumination at position (x,y,z)
-
-		  domega = The solid angle at the pixel corresponding to 
-		  (x,y,z).  For these light probes, this is given by 
-
-		  x,y,z  = Cartesian components of surface normal
-
-		  Notes:   Of course, there are better numerical methods to do
-		  integration, but this naive approach is sufficient for our
-		  purpose.
-
-		 *********************************************************************/
-
-		int col ;
-		for (col = 0 ; col < 3 ; col++) {
-			float c ; /* A different constant for each coefficient */
-
-			/* L_{00}.  Note that Y_{00} = 0.282095 */
-			c = 0.282095 ;
-			coeffs[0][col] += hdr[col]*c*domega ;
-
-			/* L_{1m}. -1 <= m <= 1.  The linear terms */
-			c = 0.488603 ;
-			coeffs[1][col] += hdr[col]*(c*y)*domega ;   /* Y_{1-1} = 0.488603 y  */
-			coeffs[2][col] += hdr[col]*(c*z)*domega ;   /* Y_{10}  = 0.488603 z  */
-			coeffs[3][col] += hdr[col]*(c*x)*domega ;   /* Y_{11}  = 0.488603 x  */
-
-			/* The Quadratic terms, L_{2m} -2 <= m <= 2 */
-
-			/* First, L_{2-2}, L_{2-1}, L_{21} corresponding to xy,yz,xz */
-			c = 1.092548 ;
-			coeffs[4][col] += hdr[col]*(c*x*y)*domega ; /* Y_{2-2} = 1.092548 xy */ 
-			coeffs[5][col] += hdr[col]*(c*y*z)*domega ; /* Y_{2-1} = 1.092548 yz */ 
-			coeffs[7][col] += hdr[col]*(c*x*z)*domega ; /* Y_{21}  = 1.092548 xz */ 
-
-			/* L_{20}.  Note that Y_{20} = 0.315392 (3z^2 - 1) */
-			c = 0.315392 ;
-			coeffs[6][col] += hdr[col]*(c*(3*z*z-1))*domega ; 
-
-			/* L_{22}.  Note that Y_{22} = 0.546274 (x^2 - y^2) */
-			c = 0.546274 ;
-			coeffs[8][col] += hdr[col]*(c*(x*x-y*y))*domega ;
-
-		}
 	}
 
     // GLFW Callbacks_________________________________________________  
@@ -538,6 +340,9 @@ namespace {
         glViewport(0, 0, display_w, display_h);
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
+
+        glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
+        glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 		m_skybox.render( camera );
@@ -601,17 +406,6 @@ namespace {
 					}
 					break;
 
-				case GLFW_KEY_F:      
-					bFullscreen = !bFullscreen;
-#if UNDONE
-					if (bFullscreen) {
-						glutFullScreen();
-					} else {
-						glutReshapeWindow( WINDOW_WIDTH, WINDOW_HEIGHT);
-					}
-#endif
-					break;
-
 				case GLFW_KEY_R:
 					m_skybox.toggleAutoRotate();
 					break;
@@ -646,8 +440,10 @@ namespace {
 
     void glfw_motion_callback(GLFWwindow* window, double xpos, double ypos)
     {
+		int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+		const bool bPressed = (state == GLFW_PRESS);
 		const bool mouseOverGui = ImGui::MouseOverArea();
-		if (!mouseOverGui) camera.motionHandler( xpos, ypos, false);    
+		if (!mouseOverGui && bPressed) camera.motionHandler( xpos, ypos, false);    
     }  
 
     void glfw_mouse_callback(GLFWwindow* window, int button, int action, int mods)

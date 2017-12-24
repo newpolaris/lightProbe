@@ -185,5 +185,8 @@ endif(UseBullet)
 
 ### FreeImage ###
 if(WIN32)
-	add_subdirectory (FreeImage)
+	add_subdirectory(FreeImage)
 endif(WIN32)
+
+### ImGUI ###
+add_subdirectory(ImGUI)

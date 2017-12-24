@@ -1,9 +1,18 @@
 # CMake entry point
 cmake_minimum_required (VERSION 3.0)
-project (IrradianceEnvMap)
+project (ibl)
+
+set(APP_TARGET ibl.app)
+
+#if( APPLE )
+#	set( CMAKE_CXX_FLAGS "-ObjC++ --std=c++11" )
+#elseif(UNIX)
+    set(CMAKE_CXX_STANDARD 11)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+#endif()
 
 find_package(OpenGL REQUIRED)
- 
+
 # Compile external dependencies 
 add_subdirectory (external)
 
@@ -38,6 +47,7 @@ set(ALL_LIBS
 	glfw
 	GLEW_1130
 	FreeImage
+	imgui
 )
 
 add_definitions(
@@ -53,10 +63,10 @@ add_library( glsw ${GLSW} )
 
 file( GLOB_RECURSE SRC src/* )
 
-add_executable(iem ${SRC})
+add_executable(${APP_TARGET} ${SRC})
 
-target_link_libraries(iem glsw ${ALL_LIBS})
+target_link_libraries(${APP_TARGET} glsw ${ALL_LIBS})
 
 # Xcode and Visual working directories
-set_target_properties(iem PROPERTIES XCODE_ATTRIBUTE_CONFIGURATION_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/")
-create_target_launcher(iem WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/")
+set_target_properties(${APP_TARGET} PROPERTIES XCODE_ATTRIBUTE_CONFIGURATION_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/")
+create_target_launcher(${APP_TARGET} WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/")

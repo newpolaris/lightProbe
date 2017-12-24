@@ -22,6 +22,10 @@
 #include <cstdio>
 #include <cstring>
 
+// imgui
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw_gl3.h>
+
 #include <tools/TCamera.hpp>
 #include <tools/Timer.hpp>
 #include <tools/Logger.hpp>
@@ -37,6 +41,17 @@
 #include <memory>
 
 #define GL_ASSERT(x) {x; CHECKGLERROR()}
+
+namespace ImGui
+{
+	inline bool MouseOverArea()
+	{
+		return false
+			|| ImGui::IsAnyItemHovered()
+			|| ImGui::IsMouseHoveringAnyWindow()
+			;
+	}
+}
 
 namespace
 {
@@ -89,6 +104,8 @@ namespace
     void glfw_reshape_callback(GLFWwindow* window, int width, int height);
     void glfw_mouse_callback(GLFWwindow* window, int button, int action, int mods);
     void glfw_motion_callback(GLFWwindow* window, double xpos, double ypos);
+	void glfw_char_callback(GLFWwindow* windows, unsigned int c);
+	void glfw_scroll_callback(GLFWwindow* windows, double xoffset, double yoffset);
 }
 
 namespace {
@@ -120,6 +137,18 @@ namespace {
 
 		// OpenGL
 		initGL();
+
+		ImGui_ImplGlfwGL3_Init(window, false);
+
+		// Load FontsR
+		// (there is a default font, this is only if you want to change it. see extra_fonts/README.txt for more details)
+		//ImGuiIO& io = ImGui::GetIO();
+		//io.Fonts->AddFontDefault();
+		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/Cousine-Regular.ttf", 15.0f);
+		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/DroidSans.ttf", 16.0f);
+		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyClean.ttf", 13.0f);
+		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyTiny.ttf", 10.0f);
+		//io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
 
 		// GLSW : shader file manager
 		glswInit();
@@ -186,7 +215,10 @@ namespace {
 	void initGL()
 	{
         // Clear the error buffer (it starts with an error).
-        glGetError();
+		GLenum err;
+		while ((err = glGetError()) != GL_NO_ERROR) {
+			std::cerr << "OpenGL error: " << err << std::endl;
+		}
 
         std::printf("%s\n%s\n", 
                 glGetString(GL_RENDERER),  // e.g. Intel HD Graphics 3000 OpenGL Engine
@@ -217,8 +249,8 @@ namespace {
 			exit( EXIT_FAILURE );
 		}
 		glfwWindowHint(GLFW_SAMPLES, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
@@ -235,7 +267,8 @@ namespace {
 		glfwSetKeyCallback( window, glfw_keyboard_callback );
 		glfwSetMouseButtonCallback( window, glfw_mouse_callback );
 		glfwSetCursorPosCallback( window, glfw_motion_callback );
-
+		glfwSetCharCallback( window, glfw_char_callback );
+		glfwSetScrollCallback( window, glfw_scroll_callback );
 	}
 
 	void finalizeApp()
@@ -246,6 +279,7 @@ namespace {
         m_texture->destroy();
 		m_skydome.shutdown();
         Logger::getInstance().close();
+		ImGui_ImplGlfwGL3_Shutdown();
 		glfwTerminate();
 	}
 
@@ -464,9 +498,48 @@ namespace {
         camera.update();
         // app.update();
 
-        glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
-        glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
+        ImGui_ImplGlfwGL3_NewFrame();
 
+		bool show_test_window = true;
+		bool show_another_window = false;
+		ImVec4 clear_color = ImColor(114, 144, 154);
+
+		// 1. Show a simple window
+		// Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
+		{
+			static float f = 0.0f;
+			ImGui::Text("Hello, world!");
+			ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+			ImGui::ColorEdit3("clear color", (float*)&clear_color);
+			if (ImGui::Button("Test Window")) show_test_window ^= 1;
+			if (ImGui::Button("Another Window")) show_another_window ^= 1;
+			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+		}
+
+        // 2. Show another simple window, this time using an explicit Begin/End pair
+        if (show_another_window)
+        {
+            ImGui::SetNextWindowSize(ImVec2(200,100), ImGuiSetCond_FirstUseEver);
+            ImGui::Begin("Another Window", &show_another_window);
+            ImGui::Text("Hello");
+            ImGui::End();
+        }
+
+        // 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
+        if (show_test_window)
+        {
+            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+            ImGui::ShowTestWindow(&show_test_window);
+        }
+
+        // Rendering
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 		m_skybox.render( camera );
 		// m_skydome.render( camera );
 
@@ -497,12 +570,19 @@ namespace {
 
         // app.render();
         m_program.unbind();
+
+        ImGui::Render();
     }
 
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 
 	{
-        moveCamera( key, action != GLFW_RELEASE);
+		if (ImGui::IsWindowFocused())
+		{
+			ImGui_ImplGlfwGL3_KeyCallback(window, key, scancode, action, mods);
+			return;
+		}
 
+		moveCamera( key, action != GLFW_RELEASE);
 		bool bPressed = action == GLFW_PRESS;
 		if (bPressed) {
 			switch (key)
@@ -566,17 +646,34 @@ namespace {
 
     void glfw_motion_callback(GLFWwindow* window, double xpos, double ypos)
     {
-        camera.motionHandler( xpos, ypos, false);    
+		const bool mouseOverGui = ImGui::MouseOverArea();
+		if (!mouseOverGui) camera.motionHandler( xpos, ypos, false);    
     }  
 
     void glfw_mouse_callback(GLFWwindow* window, int button, int action, int mods)
     {
+        ImGui_ImplGlfwGL3_MouseButtonCallback(window, button, action, mods);
+
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) { 
 			double xpos, ypos;
 			glfwGetCursorPos(window, &xpos, &ypos);
-			camera.motionHandler( xpos, ypos, true); 
+			const bool mouseOverGui = ImGui::MouseOverArea();
+			if (!mouseOverGui)
+				camera.motionHandler( xpos, ypos, true); 
 		}    
     }
+
+
+	void glfw_char_callback(GLFWwindow* windows, unsigned int c)
+	{
+		ImGui_ImplGlfwGL3_CharCallback(windows, c);
+	}
+
+	void glfw_scroll_callback(GLFWwindow* windows, double xoffset, double yoffset)
+	{
+		ImGui_ImplGlfwGL3_ScrollCallback(windows, xoffset, yoffset);
+	}
+
 }
 
 int main(int argc, char** argv)

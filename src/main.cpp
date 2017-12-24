@@ -44,6 +44,99 @@
 
 namespace ImGui
 {
+#define IMGUI_FLAGS_NONE        UINT8_C(0x00)
+#define IMGUI_FLAGS_ALPHA_BLEND UINT8_C(0x01)
+
+#if 0
+	// Helper function for passing bgfx::TextureHandle to ImGui::Image.
+	inline void Image(bgfx::TextureHandle _handle
+		, uint8_t _flags
+		, uint8_t _mip
+		, const ImVec2& _size
+		, const ImVec2& _uv0       = ImVec2(0.0f, 0.0f)
+		, const ImVec2& _uv1       = ImVec2(1.0f, 1.0f)
+		, const ImVec4& _tintCol   = ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
+		, const ImVec4& _borderCol = ImVec4(0.0f, 0.0f, 0.0f, 0.0f)
+		)
+	{
+		union { struct { bgfx::TextureHandle handle; uint8_t flags; uint8_t mip; } s; ImTextureID ptr; } texture;
+		texture.s.handle = _handle;
+		texture.s.flags  = _flags;
+		texture.s.mip    = _mip;
+		Image(texture.ptr, _size, _uv0, _uv1, _tintCol, _borderCol);
+	}
+
+	// Helper function for passing bgfx::TextureHandle to ImGui::Image.
+	inline void Image(bgfx::TextureHandle _handle
+		, const ImVec2& _size
+		, const ImVec2& _uv0       = ImVec2(0.0f, 0.0f)
+		, const ImVec2& _uv1       = ImVec2(1.0f, 1.0f)
+		, const ImVec4& _tintCol   = ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
+		, const ImVec4& _borderCol = ImVec4(0.0f, 0.0f, 0.0f, 0.0f)
+		)
+	{
+		Image(_handle, IMGUI_FLAGS_ALPHA_BLEND, 0, _size, _uv0, _uv1, _tintCol, _borderCol);
+	}
+
+	// Helper function for passing bgfx::TextureHandle to ImGui::ImageButton.
+	inline bool ImageButton(bgfx::TextureHandle _handle
+		, uint8_t _flags
+		, uint8_t _mip
+		, const ImVec2& _size
+		, const ImVec2& _uv0     = ImVec2(0.0f, 0.0f)
+		, const ImVec2& _uv1     = ImVec2(1.0f, 1.0f)
+		, int _framePadding      = -1
+		, const ImVec4& _bgCol   = ImVec4(0.0f, 0.0f, 0.0f, 0.0f)
+		, const ImVec4& _tintCol = ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
+		)
+	{
+		union { struct { bgfx::TextureHandle handle; uint8_t flags; uint8_t mip; } s; ImTextureID ptr; } texture;
+		texture.s.handle = _handle;
+		texture.s.flags  = _flags;
+		texture.s.mip    = _mip;
+		return ImageButton(texture.ptr, _size, _uv0, _uv1, _framePadding, _bgCol, _tintCol);
+	}
+
+	// Helper function for passing bgfx::TextureHandle to ImGui::ImageButton.
+	inline bool ImageButton(bgfx::TextureHandle _handle
+		, const ImVec2& _size
+		, const ImVec2& _uv0     = ImVec2(0.0f, 0.0f)
+		, const ImVec2& _uv1     = ImVec2(1.0f, 1.0f)
+		, int _framePadding      = -1
+		, const ImVec4& _bgCol   = ImVec4(0.0f, 0.0f, 0.0f, 0.0f)
+		, const ImVec4& _tintCol = ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
+		)
+	{
+		return ImageButton(_handle, IMGUI_FLAGS_ALPHA_BLEND, 0, _size, _uv0, _uv1, _framePadding, _bgCol, _tintCol);
+	}
+#endif
+
+	inline void NextLine()
+	{
+		SetCursorPosY(GetCursorPosY() + GetTextLineHeightWithSpacing() );
+	}
+
+	inline bool TabButton(const char* _text, float _width, bool _active)
+	{
+		int32_t count = 1;
+
+		if (_active)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.75f, 0.0f, 0.78f) );
+			ImGui::PushStyleColor(ImGuiCol_Text,   ImVec4(0.0f, 0.0f,  0.0f, 1.0f ) );
+			count = 2;
+		}
+		else
+		{
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.7f) );
+		}
+
+		bool retval = ImGui::Button(_text, ImVec2(_width, 20.0f) );
+		ImGui::PopStyleColor(count);
+
+		return retval;
+	}
+
 	inline bool MouseOverArea()
 	{
 		return false
@@ -53,13 +146,83 @@ namespace ImGui
 	}
 }
 
+struct LightProbe
+{
+	enum Enum
+	{
+		Bolonga,
+		Kyoto,
+
+		Count
+	};
+};
+
+struct Settings
+{
+	Settings()
+	{
+		m_envRotCurr = 0.0f;
+		m_envRotDest = 0.0f;
+		m_lightDir[0] = -0.8f;
+		m_lightDir[1] = 0.2f;
+		m_lightDir[2] = -0.5f;
+		m_lightCol[0] = 1.0f;
+		m_lightCol[1] = 1.0f;
+		m_lightCol[2] = 1.0f;
+		m_glossiness = 0.7f;
+		m_exposure = 0.0f;
+		m_bgType = 3.0f;
+		m_radianceSlider = 2.0f;
+		m_reflectivity = 0.85f;
+		m_rgbDiff[0] = 1.0f;
+		m_rgbDiff[1] = 1.0f;
+		m_rgbDiff[2] = 1.0f;
+		m_rgbSpec[0] = 1.0f;
+		m_rgbSpec[1] = 1.0f;
+		m_rgbSpec[2] = 1.0f;
+		m_lod = 0.0f;
+		m_doDiffuse = false;
+		m_doSpecular = false;
+		m_doDiffuseIbl = true;
+		m_doSpecularIbl = true;
+		m_showLightColorWheel = true;
+		m_showDiffColorWheel = true;
+		m_showSpecColorWheel = true;
+		m_metalOrSpec = 0;
+		m_meshSelection = 0;
+	}
+
+	float m_envRotCurr;
+	float m_envRotDest;
+	float m_lightDir[3];
+	float m_lightCol[3];
+	float m_glossiness;
+	float m_exposure;
+	float m_radianceSlider;
+	float m_bgType;
+	float m_reflectivity;
+	float m_rgbDiff[3];
+	float m_rgbSpec[3];
+	float m_lod;
+	bool  m_doDiffuse;
+	bool  m_doSpecular;
+	bool  m_doDiffuseIbl;
+	bool  m_doSpecularIbl;
+	bool  m_showLightColorWheel;
+	bool  m_showDiffColorWheel;
+	bool  m_showSpecColorWheel;
+	int32_t m_metalOrSpec;
+	int32_t m_meshSelection;
+};
+
+
 namespace
 {
 	struct fRGB {
 		float r, g, b; 
 	};
-    const unsigned int WINDOW_WIDTH = 800u;
-    const unsigned int WINDOW_HEIGHT = 600u;
+    const unsigned int WINDOW_WIDTH = 1280;
+    const unsigned int WINDOW_HEIGHT = 960;
 	const char* WINDOW_NAME = "Irradiance Environment Mapping";
 
 	bool bCloseApp = false;
@@ -70,14 +233,17 @@ namespace
     SphereMesh m_mesh( 48, 5.0f);
 	SkyBox m_skybox;
 	Skydome m_skydome;
+	Settings m_settings;
 
-    //~
+	LightProbe::Enum m_currentLightProbe;
+
+    //?
 
     TCamera camera;
 
     bool bWireframe = false;
 
-    //~
+    //?
 
 	void initApp(int argc, char** argv);
 	void initExtension();
@@ -91,8 +257,10 @@ namespace
 	void prefilter(fRGB* im, int width, int height);
 	void printcoeffs();
 	void tomatrix();
-    void renderScene();
-	void updatecoeffs(float hdr[3], float domega, float x, float y, float z);
+    void render();
+	void renderHUD();
+	void update();
+	void updateHUD();
 
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
     void glfw_reshape_callback(GLFWwindow* window, int width, int height);
@@ -143,7 +311,7 @@ namespace {
 		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/DroidSans.ttf", 16.0f);
 		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyClean.ttf", 13.0f);
 		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyTiny.ttf", 10.0f);
-		//io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
+		//io.Fonts->AddFontFromFileTTF("c:??Windows??Fonts??ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
 
 		// GLSW : shader file manager
 		glswInit();
@@ -186,11 +354,11 @@ namespace {
         GLenum result = glewInit(); 
         if (result != GLEW_OK)
         {
-            fprintf( stderr, "Error: %s\n", glewGetErrorString(result));
+            fprintf( stderr, "Error: %s?n", glewGetErrorString(result));
             exit( EXIT_FAILURE );
         }
 
-        fprintf( stderr, "GLEW version : %s\n", glewGetString(GLEW_VERSION));
+        fprintf( stderr, "GLEW version : %s?n", glewGetString(GLEW_VERSION));
 	}
 
 	void initGL()
@@ -201,7 +369,7 @@ namespace {
 			std::cerr << "OpenGL error: " << err << std::endl;
 		}
 
-        std::printf("%s\n%s\n", 
+        std::printf("%s?n%s?n", 
 			glGetString(GL_RENDERER),  // e.g. Intel HD Graphics 3000 OpenGL Engine
 			glGetString(GL_VERSION)    // e.g. 3.2 INTEL-8.0.61
         );
@@ -226,7 +394,7 @@ namespace {
 		// Initialise GLFW
 		if( !glfwInit() )
 		{
-			fprintf( stderr, "Failed to initialize GLFW\n" );
+			fprintf( stderr, "Failed to initialize GLFW?n" );
 			exit( EXIT_FAILURE );
 		}
 		glfwWindowHint(GLFW_SAMPLES, 4);
@@ -237,11 +405,12 @@ namespace {
 		
 		window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_NAME, NULL, NULL );
 		if ( window == NULL ) {
-			fprintf( stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n" );
+			fprintf( stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.?n" );
 			glfwTerminate();
 			exit( EXIT_FAILURE );
 		}
 		glfwMakeContextCurrent(window);
+		glfw_reshape_callback( window, WINDOW_WIDTH, WINDOW_HEIGHT );
 
 		// GLFW Events' Callback
 		glfwSetWindowSizeCallback( window, glfw_reshape_callback );
@@ -267,7 +436,8 @@ namespace {
 	void mainLoopApp()
 	{
 		do {
-			renderScene();
+			update();
+			render();
 
 			/* Swap front and back buffers */
 			glfwSwapBuffers(window);
@@ -288,63 +458,197 @@ namespace {
 
     void glfw_reshape_callback(GLFWwindow* window, int width, int height)
     {
-        glViewport( 0, 0, width, height);
+        glViewport(0, 0, width, height);
 
         float aspectRatio = ((float)width) / ((float)height);
-        camera.setProjectionParams( 60.0f, aspectRatio, 0.1f, 250.0f);
+        camera.setProjectionParams( 45.0f, aspectRatio, 0.1f, 250.0f);
     }
 
-    void renderScene()
-    {    
+	void update()
+	{
         Timer::getInstance().update();
         camera.update();
         // app.update();
+		updateHUD();
+	}
 
-        ImGui_ImplGlfwGL3_NewFrame();
+	void updateHUD()
+	{
+		ImGui_ImplGlfwGL3_NewFrame();
 
-		bool show_test_window = true;
-		bool show_another_window = false;
-		ImVec4 clear_color = ImColor(114, 144, 154);
+		auto width = WINDOW_WIDTH, height = WINDOW_HEIGHT;
 
-		// 1. Show a simple window
-		// Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
+		// GUI : right menu bar
+		ImGui::SetNextWindowPos(
+				ImVec2(width - width / 5.0f - 10.0f, 10.f),
+				ImGuiSetCond_FirstUseEver);
+
+		ImGui::Begin("Settings",
+				NULL,
+				ImVec2(width / 5.0f, height - 20.0f),
+				ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::PushItemWidth(180.0f);
+
+		ImGui::Text("Environment light:");
+		ImGui::Indent();
+		ImGui::Checkbox("IBL Diffuse",  &m_settings.m_doDiffuseIbl);
+		ImGui::Checkbox("IBL Specular", &m_settings.m_doSpecularIbl);
 		{
-			static float f = 0.0f;
-			ImGui::Text("Hello, world!");
-			ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-			ImGui::ColorEdit3("clear color", (float*)&clear_color);
-			if (ImGui::Button("Test Window")) show_test_window ^= 1;
-			if (ImGui::Button("Another Window")) show_another_window ^= 1;
-			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			float tabWidth = ImGui::GetContentRegionAvailWidth() / 2.0f;
+			if (ImGui::TabButton("Bolonga", tabWidth, m_currentLightProbe == LightProbe::Bolonga) )
+			{
+				m_currentLightProbe = LightProbe::Bolonga;
+			}
+
+			ImGui::SameLine(0.0f,0.0f);
+
+			if (ImGui::TabButton("Kyoto", tabWidth, m_currentLightProbe == LightProbe::Kyoto) )
+			{
+				m_currentLightProbe = LightProbe::Kyoto;
+			}
+		}
+		ImGui::SliderFloat("Texture LOD", &m_settings.m_lod, 0.0f, 10.1f);
+		ImGui::Unindent();
+
+		ImGui::Separator();
+		ImGui::Text("Directional light:");
+		ImGui::Indent();
+		ImGui::Checkbox("Diffuse",  &m_settings.m_doDiffuse);
+		ImGui::Checkbox("Specular", &m_settings.m_doSpecular);
+		const bool doDirectLighting = m_settings.m_doDiffuse || m_settings.m_doSpecular;
+		if (doDirectLighting)
+		{
+			ImGui::SliderFloat("Light direction X", &m_settings.m_lightDir[0], -1.0f, 1.0f);
+			ImGui::SliderFloat("Light direction Y", &m_settings.m_lightDir[1], -1.0f, 1.0f);
+			ImGui::SliderFloat("Light direction Z", &m_settings.m_lightDir[2], -1.0f, 1.0f);
+			ImGui::ColorWheel("Color:", m_settings.m_lightCol, 0.6f);
+		}
+		ImGui::Unindent();
+
+		ImGui::Separator();
+		ImGui::Text("Background:");
+		ImGui::Indent();
+		{
+			int32_t selection;
+			if (0.0f == m_settings.m_bgType)
+			{
+				selection = UINT8_C(0);
+			}
+			else if (7.0f == m_settings.m_bgType)
+			{
+				selection = UINT8_C(2);
+			}
+			else
+			{
+				selection = UINT8_C(1);
+			}
+
+			float tabWidth = ImGui::GetContentRegionAvailWidth() / 3.0f;
+			if (ImGui::TabButton("Skybox", tabWidth, selection == 0) )
+			{
+				selection = 0;
+			}
+
+			ImGui::SameLine(0.0f,0.0f);
+			if (ImGui::TabButton("Radiance", tabWidth, selection == 1) )
+			{
+				selection = 1;
+			}
+
+			ImGui::SameLine(0.0f,0.0f);
+			if (ImGui::TabButton("Irradiance", tabWidth, selection == 2) )
+			{
+				selection = 2;
+			}
+
+			if (0 == selection)
+			{
+				m_settings.m_bgType = 0.0f;
+			}
+			else if (2 == selection)
+			{
+				m_settings.m_bgType = 7.0f;
+			}
+			else
+			{
+				m_settings.m_bgType = m_settings.m_radianceSlider;
+			}
+
+			const bool isRadiance = (selection == 1);
+			if (isRadiance)
+			{
+				ImGui::SliderFloat("Mip level", &m_settings.m_radianceSlider, 1.0f, 6.0f);
+			}
+		}
+		ImGui::Unindent();
+
+		ImGui::Separator();
+		ImGui::Text("Post processing:");
+		ImGui::Indent();
+		ImGui::SliderFloat("Exposure",& m_settings.m_exposure, -4.0f, 4.0f);
+		ImGui::Unindent();
+
+		ImGui::PopItemWidth();
+		ImGui::End();
+
+		// GUI : left menu bar
+		ImGui::SetNextWindowPos(
+				ImVec2(10.0f, 260.0f),
+				ImGuiSetCond_FirstUseEver);
+
+		ImGui::Begin("Mesh", 
+				NULL, 
+				ImVec2(width / 5.0f, 450.f),
+				ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::Text("Mesh:");
+		ImGui::Indent();
+		ImGui::RadioButton("Bunny", &m_settings.m_meshSelection, 0);
+		ImGui::RadioButton("Orbs",  &m_settings.m_meshSelection, 1);
+		ImGui::Unindent();
+
+		const bool isBunny = (0 == m_settings.m_meshSelection);
+		if (!isBunny)
+		{
+			m_settings.m_metalOrSpec = 0;
+		}
+		else
+		{
+			ImGui::Separator();
+			ImGui::Text("Workflow:");
+			ImGui::Indent();
+			ImGui::RadioButton("Metalness", &m_settings.m_metalOrSpec, 0);
+			ImGui::RadioButton("Specular", &m_settings.m_metalOrSpec, 1);
+			ImGui::Unindent();
+
+			ImGui::Separator();
+			ImGui::Text("Material:");
+			ImGui::Indent();
+			ImGui::PushItemWidth(130.0f);
+			ImGui::SliderFloat("Glossiness", &m_settings.m_glossiness, 0.0f, 1.0f);
+			ImGui::SliderFloat(0 == m_settings.m_metalOrSpec ? "Metalness" : "Diffuse - Specular", &m_settings.m_reflectivity, 0.0f, 1.0f);
+			ImGui::PopItemWidth();
+			ImGui::Unindent();
 		}
 
-        // 2. Show another simple window, this time using an explicit Begin/End pair
-        if (show_another_window)
-        {
-            ImGui::SetNextWindowSize(ImVec2(200,100), ImGuiSetCond_FirstUseEver);
-            ImGui::Begin("Another Window", &show_another_window);
-            ImGui::Text("Hello");
-            ImGui::End();
-        }
+		ImGui::ColorWheel("Diffuse:", &m_settings.m_rgbDiff[0], 0.7f);
+		ImGui::Separator();
+		if ( (1 == m_settings.m_metalOrSpec) && isBunny )
+		{
+			ImGui::ColorWheel("Specular:", &m_settings.m_rgbSpec[0], 0.7f);
+		}
+		ImGui::End();
+	}
 
-        // 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
-        if (show_test_window)
-        {
-            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-            ImGui::ShowTestWindow(&show_test_window);
-        }
-
+    void render()
+    {    
         // Rendering
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT);
-
+        glClearColor(0, 0, 0, 0);
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
-        glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 		m_skybox.render( camera );
 		// m_skydome.render( camera );
 
@@ -372,20 +676,21 @@ namespace {
         cubemap->bind(0u);
         m_mesh.draw();
         cubemap->unbind(0u);
-
-        // app.render();
         m_program.unbind();
 
-        ImGui::Render();
+		renderHUD();
     }
+
+	void renderHUD()
+	{
+		// restore some state
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        ImGui::Render();
+	}
 
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 
 	{
-		if (ImGui::IsWindowFocused())
-		{
-			ImGui_ImplGlfwGL3_KeyCallback(window, key, scancode, action, mods);
-			return;
-		}
+		ImGui_ImplGlfwGL3_KeyCallback(window, key, scancode, action, mods);
 
 		moveCamera( key, action != GLFW_RELEASE);
 		bool bPressed = action == GLFW_PRESS;
@@ -402,7 +707,7 @@ namespace {
 				case GLFW_KEY_T:
 					{
 						Timer &timer = Timer::getInstance();
-						printf( "fps : %d [%.3f ms]\n", timer.getFPS(), timer.getElapsedTime());
+						printf( "fps : %d [%.3f ms]?n", timer.getFPS(), timer.getElapsedTime());
 					}
 					break;
 

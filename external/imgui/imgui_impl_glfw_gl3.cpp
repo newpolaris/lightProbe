@@ -8,6 +8,10 @@
 
 #include "imgui.h"
 #include "imgui_impl_glfw_gl3.h"
+#include "roboto_regular.ttf.h"
+#include "robotomono_regular.ttf.h" 
+#include "icons_kenney.ttf.h"
+#include "icons_font_awesome.ttf.h"
 
 // GL3W/GLFW
 #include <GL/glew.h>    // This example is using gl3w to access OpenGL functions (because it is small). You may use glew/glad/glLoadGen/etc. whatever already works for you.
@@ -29,6 +33,30 @@ static int          g_ShaderHandle = 0, g_VertHandle = 0, g_FragHandle = 0;
 static int          g_AttribLocationTex = 0, g_AttribLocationProjMtx = 0;
 static int          g_AttribLocationPosition = 0, g_AttribLocationUV = 0, g_AttribLocationColor = 0;
 static unsigned int g_VboHandle = 0, g_VaoHandle = 0, g_ElementsHandle = 0;
+static ImFont* m_font[ImGui::Font::Count];
+
+struct FontRangeMerge
+{
+	const void* data;
+	size_t      size;
+	ImWchar     ranges[3];
+};
+
+#if 0
+static FontRangeMerge s_fontRangeMerge[] =
+{
+	{ s_iconsKenneyTtf,      sizeof(s_iconsKenneyTtf),      { ICON_MIN_KI, ICON_MAX_KI, 0 } },
+	{ s_iconsFontAwesomeTtf, sizeof(s_iconsFontAwesomeTtf), { ICON_MIN_FA, ICON_MAX_FA, 0 } },
+};
+#endif
+
+namespace ImGui
+{
+	void PushFont(Font::Enum _font)
+	{
+		PushFont(m_font[_font]);
+	}
+}
 
 // This is the main rendering function that you have to implement and provide to ImGui (via setting up 'RenderDrawListsFn' in the ImGuiIO structure)
 // If text or lines are blurry when integrating ImGui in your engine:
@@ -341,6 +369,42 @@ bool    ImGui_ImplGlfwGL3_Init(GLFWwindow* window, bool install_callbacks)
         glfwSetKeyCallback(window, ImGui_ImplGlfwGL3_KeyCallback);
         glfwSetCharCallback(window, ImGui_ImplGlfwGL3_CharCallback);
     }
+
+	uint8_t* data;
+	int32_t width;
+	int32_t height;
+	{
+#if 0
+		ImFontConfig config;
+		config.FontDataOwnedByAtlas = false;
+		config.MergeMode = false;
+		//			config.MergeGlyphCenterV = true;
+
+		float _fontSize = 18.f;
+		const ImWchar* ranges = io.Fonts->GetGlyphRangesCyrillic();
+		m_font[ImGui::Font::Regular] = io.Fonts->AddFontFromMemoryTTF( (void*)s_robotoRegularTtf,     sizeof(s_robotoRegularTtf),     _fontSize,      &config, ranges);
+		m_font[ImGui::Font::Mono   ] = io.Fonts->AddFontFromMemoryTTF( (void*)s_robotoMonoRegularTtf, sizeof(s_robotoMonoRegularTtf), _fontSize-3.0f, &config, ranges);
+
+		config.MergeMode = true;
+		config.DstFont   = m_font[ImGui::Font::Regular];
+
+		for (uint32_t ii = 0; ii < BX_COUNTOF(s_fontRangeMerge); ++ii)
+		{
+			const FontRangeMerge& frm = s_fontRangeMerge[ii];
+
+			io.Fonts->AddFontFromMemoryTTF( (void*)frm.data
+					, (int)frm.size
+					, _fontSize-3.0f
+					, &config
+					, frm.ranges
+					);
+		}
+#endif
+	}
+
+	io.Fonts->GetTexDataAsRGBA32(&data, &width, &height);
+
+	ImGui::InitDockContext();
 
     return true;
 }

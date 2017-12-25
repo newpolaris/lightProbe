@@ -192,7 +192,7 @@ void IndexBuffer::create(std::vector<unsigned int>& indices)
 
     GL_ASSERT(glGenBuffers(1, &m_ebo));
 	bind();
-    GL_ASSERT(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*m_NumIndices, &indices[0], GL_STATIC_DRAW));
+    GL_ASSERT(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*m_NumIndices, indices.data(), GL_STATIC_DRAW));
 	unbind();
 }
 
@@ -378,7 +378,8 @@ bool ModelAssImp::loadFromFile(const std::string& filename)
 
 		// index buffer 
 		const int NumFaces = paiMesh->mNumFaces;
-		std::vector<unsigned int> indices(NumFaces * 3);
+		std::vector<unsigned int> indices;
+		indices.reserve(NumFaces * 3);
 		for (unsigned int i = 0; i < NumFaces; i++) {
 			const aiFace& face = paiMesh->mFaces[i];
 			indices.push_back(face.mIndices[0]); 
@@ -533,18 +534,8 @@ namespace
 
 namespace {
 	using namespace std;
+
 	typedef unsigned long DWORD;
-	template <typename... Args>
-	void eTB_ColorPrintf(uint32_t color, const std::string& fmt, Args... args)
-	{
-		printf(fmt.c_str(), args...);
-	}
-
-	void eTB_FlushConsole()
-	{
-		fflush(stdout);
-	}
-
 	const char* ETB_GL_DEBUG_SOURCE_STR (GLenum source)
 	{
 		static const char* sources [] = {
@@ -574,24 +565,8 @@ namespace {
 		static const char* severities [] = {
 			"High", "Medium", "Low", "Unknown"
 		};
-
 		int str_idx = min ( (size_t)(severity - GL_DEBUG_SEVERITY_HIGH), sizeof(severities)/sizeof(const char *));
-
 		return severities [str_idx];
-	}
-
-	DWORD ETB_GL_DEBUG_SEVERITY_COLOR (GLenum severity)
-	{
-		static DWORD severities [] = {
-			0xff0000ff, // High (Red)
-			0xff00ffff, // Med  (Yellow)
-			0xff00ff00, // Low  (Green)
-			0xffffffff  // ???  (White)
-		};
-
-		int col_idx = min( (size_t)(severity - GL_DEBUG_SEVERITY_HIGH), sizeof(severities)/sizeof(DWORD));
-
-		return severities [col_idx];
 	}
 
 	void ETB_GL_ERROR_CALLBACK (
@@ -603,28 +578,24 @@ namespace {
 			const GLchar* message,
 			GLvoid*       userParam)
 	{
-		eTB_ColorPrintf (0xff00ffff, "OpenGL Error:\n");
-		eTB_ColorPrintf (0xff808080, "=============\n");
+		printf("OpenGL Error:\n");
+		printf("=============\n");
+		printf(" Object ID: ");
+		printf("%d\n", id);
+		printf(" Severity:  ");
+		printf("%s\n", ETB_GL_DEBUG_SEVERITY_STR(severity));
 
-		eTB_ColorPrintf (0xff6060ff, " Object ID: ");
-		eTB_ColorPrintf (0xff0080ff, "%d\n", id);
+		printf(" Type:      ");
+		printf("%s\n", ETB_GL_DEBUG_TYPE_STR     (type));
 
-		eTB_ColorPrintf (0xff60ff60, " Severity:  ");
-		eTB_ColorPrintf ( ETB_GL_DEBUG_SEVERITY_COLOR   (severity),
-				"%s\n",
-				ETB_GL_DEBUG_SEVERITY_STR (severity) );
+		printf(" Source:    ");
+		printf("%s\n", ETB_GL_DEBUG_SOURCE_STR   (source));
 
-		eTB_ColorPrintf (0xffddff80, " Type:      ");
-		eTB_ColorPrintf (0xffccaa80, "%s\n", ETB_GL_DEBUG_TYPE_STR     (type));
-
-		eTB_ColorPrintf (0xffddff80, " Source:    ");
-		eTB_ColorPrintf (0xffccaa80, "%s\n", ETB_GL_DEBUG_SOURCE_STR   (source));
-
-		eTB_ColorPrintf (0xffff6060, " Message:   ");
-		eTB_ColorPrintf (0xff0000ff, "%s\n\n", message);
+		printf(" Message:   ");
+		printf("%s\n\n", message);
 
 		// Force the console to flush its contents before executing a breakpoint
-		eTB_FlushConsole ();
+		fflush(stdout);
 
 		// Trigger a breakpoint in gDEBugger...
 		glFinish ();
@@ -778,9 +749,9 @@ namespace {
 			exit( EXIT_FAILURE );
 		}
 		glfwWindowHint(GLFW_SAMPLES, 4);
-		// glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
+		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		

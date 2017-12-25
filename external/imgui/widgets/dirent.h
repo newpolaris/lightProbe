@@ -13,6 +13,9 @@
  * Include windows.h without Windows Sockets 1.1 to prevent conflicts with
  * Windows Sockets 2.0.
  */
+#if !WIN
+#include <dirent.h>
+#else
 #ifndef WIN32_LEAN_AND_MEAN
 #   define WIN32_LEAN_AND_MEAN
 #endif
@@ -1153,6 +1156,7 @@ dirent_set_errno(
 
 #ifdef __cplusplus
 }
+#endif
 #endif
 #endif /*DIRENT_H*/
 

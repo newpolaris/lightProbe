@@ -12,3 +12,4 @@ external/FreeImage/Release/
 external/FreeImage/FreeImage.dir/
 external/FreeImage/FreeImageTest.dir/
 build/
+imgui.ini

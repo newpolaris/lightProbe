@@ -22,7 +22,7 @@
   #define CHECKGLERROR()
   #define CHECKVALUE(x)
 #endif
-
+#define GL_ASSERT(x) {x; CHECKGLERROR()}
 
 namespace gltools
 {

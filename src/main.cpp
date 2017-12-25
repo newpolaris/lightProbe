@@ -280,8 +280,8 @@ void BaseMesh::render()
 	if (m_Material)
 	{
 	}
-	m_IndexBuffer.enable();  
 	m_VertexBuffer.enable();  
+	m_IndexBuffer.enable();  
 	const unsigned int numIndices = m_IndexBuffer.m_NumIndices;
 	GL_ASSERT(glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, 0));
 	m_VertexBuffer.disable();
@@ -323,7 +323,8 @@ bool ModelAssImp::loadFromFile(const std::string& filename)
 		| aiProcess_SortByPType
 		| aiProcess_OptimizeMeshes
 		| aiProcess_CalcTangentSpace
-		| aiProcess_JoinIdenticalVertices;
+		| aiProcess_JoinIdenticalVertices
+		;
 
 	const aiScene* pScene = Importer.ReadFile(filename.c_str(), postprocess);
 	assert(pScene != nullptr);
@@ -678,7 +679,7 @@ namespace {
 		m_skybox.setCubemap( 0u );
 
 		m_bunny = std::make_shared<ModelAssImp>();
-		m_bunny->loadFromFile( "resource/Meshes/bunny.ply" );
+		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
 	}
 
 	void initExtension()
@@ -688,11 +689,11 @@ namespace {
         GLenum result = glewInit(); 
         if (result != GLEW_OK)
         {
-            fprintf( stderr, "Error: %s?n", glewGetErrorString(result));
+            fprintf( stderr, "Error: %s\n", glewGetErrorString(result));
             exit( EXIT_FAILURE );
         }
 
-        fprintf( stderr, "GLEW version : %s?n", glewGetString(GLEW_VERSION));
+        fprintf( stderr, "GLEW version : %s\n", glewGetString(GLEW_VERSION));
 	}
 
 	void initGL()
@@ -703,26 +704,27 @@ namespace {
 			std::cerr << "OpenGL error: " << err << std::endl;
 		}
 
-        std::printf("%s?n%s?n", 
+        std::printf("%s\n%s\n", 
 			glGetString(GL_RENDERER),  // e.g. Intel HD Graphics 3000 OpenGL Engine
 			glGetString(GL_VERSION)    // e.g. 3.2 INTEL-8.0.61
         );
 
 		// SUPER VERBOSE DEBUGGING!
+    #if 0
 		if (glDebugMessageControlARB != NULL) {
 			glEnable                  (GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
 			glDebugMessageControlARB  (GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
 			glDebugMessageCallbackARB ((GLDEBUGPROCARB)ETB_GL_ERROR_CALLBACK, NULL);
 		}
-
+    #endif
 		GLint flags; 
 		glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
 		if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
 		{
 			glEnable(GL_DEBUG_OUTPUT);
 			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-			glDebugMessageCallback((GLDEBUGPROCARB)ETB_GL_ERROR_CALLBACK, nullptr);
-			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
+			glDebugMessageCallback((GLDEBUGPROCARB)ETB_GL_ERROR_CALLBACK, NULL);
 		}
 
         glClearColor( 0.15f, 0.15f, 0.15f, 0.0f);
@@ -733,7 +735,6 @@ namespace {
         glDisable( GL_STENCIL_TEST );
         glClearStencil( 0 );
 
-        glDisable( GL_CULL_FACE );
         glCullFace( GL_BACK );    
         glFrontFace(GL_CCW);
 
@@ -745,19 +746,19 @@ namespace {
 		// Initialise GLFW
 		if( !glfwInit() )
 		{
-			fprintf( stderr, "Failed to initialize GLFW?n" );
+			fprintf( stderr, "Failed to initialize GLFW\n" );
 			exit( EXIT_FAILURE );
 		}
 		glfwWindowHint(GLFW_SAMPLES, 4);
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
 		window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_NAME, NULL, NULL );
 		if ( window == NULL ) {
-			fprintf( stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.?n" );
+			fprintf( stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n" );
 			glfwTerminate();
 			exit( EXIT_FAILURE );
 		}
@@ -1009,11 +1010,12 @@ namespace {
         // Use our shader
         m_program.bind();
 
-        glm::mat4 mvp = camera.getViewProjMatrix() * m_mesh.getModelMatrix();
+        glm::mat4 modelMatrix = m_mesh.getModelMatrix();
+        glm::mat4 mvp = camera.getViewProjMatrix() * modelMatrix;
         m_program.setUniform( "uModelViewProjMatrix", mvp );
 
 		// Vertex uniforms
-		m_program.setUniform( "uModelMatrix", m_mesh.getModelMatrix());
+		m_program.setUniform( "uModelMatrix", modelMatrix);
 		m_program.setUniform( "uNormalMatrix", m_mesh.getNormalMatrix());
 		m_program.setUniform( "uEyePosWS", camera.getPosition());
 		m_program.setUniform( "uInvSkyboxRotation", m_skybox.getInvRotateMatrix() );
@@ -1029,10 +1031,14 @@ namespace {
 
         cubemap->bind(0u);
         m_mesh.draw();
-        cubemap->unbind(0u);
-		m_bunny->render();
-        m_program.unbind();
 
+        mvp = camera.getViewProjMatrix() * modelMatrix;
+		m_program.setUniform( "uModelMatrix", modelMatrix);
+        m_program.setUniform( "uModelViewProjMatrix", mvp );
+		m_bunny->render();
+
+        cubemap->unbind(0u);
+        m_program.unbind();
 
 		renderHUD();
     }
@@ -1063,7 +1069,7 @@ namespace {
 				case GLFW_KEY_T:
 					{
 						Timer &timer = Timer::getInstance();
-						printf( "fps : %d [%.3f ms]?n", timer.getFPS(), timer.getElapsedTime());
+						printf( "fps : %d [%.3f ms]\n", timer.getFPS(), timer.getElapsedTime());
 					}
 					break;
 

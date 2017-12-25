@@ -13,6 +13,8 @@ set(APP_TARGET ibl.app)
 
 find_package(OpenGL REQUIRED)
 
+set(UseAssImp TRUE)
+
 # Compile external dependencies 
 add_subdirectory (external)
 
@@ -48,6 +50,7 @@ set(ALL_LIBS
 	GLEW_1130
 	FreeImage
 	imgui
+	assimp
 )
 
 add_definitions(

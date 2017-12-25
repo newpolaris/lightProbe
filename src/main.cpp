@@ -31,6 +31,11 @@
 #include <tools/Logger.hpp>
 #include <tools/gltools.hpp>
 
+// assimp
+#include <assimp/Importer.hpp>      // C++ importer interface
+#include <assimp/scene.h>           // Output data structure
+#include <assimp/postprocess.h>     // Post processing fla
+
 #include <GLType/ProgramShader.h>
 #include <GLType/Texture.h>
 #include <SkyBox.h>
@@ -39,6 +44,8 @@
 
 #include <fstream>
 #include <memory>
+#include <vector>
+#include <algorithm>
 
 #define GL_ASSERT(x) {x; CHECKGLERROR()}
 
@@ -146,6 +153,252 @@ namespace ImGui
 	}
 }
 
+class IndexBuffer
+{
+public:
+
+	IndexBuffer()
+	{
+	}
+
+	void initialize();
+	void destroy();
+
+	void create(std::vector<unsigned int>& indices);
+	void bind();
+	void unbind();
+	void enable();
+	void disable();
+
+	GLuint m_ebo = 0;
+	unsigned int m_NumIndices = 0;
+};
+
+void IndexBuffer::initialize()
+{
+}
+
+void IndexBuffer::destroy()
+{
+	if (m_ebo != 0) {
+		GL_ASSERT(glDeleteBuffers(1, &m_ebo));
+		m_ebo = 0;
+	}
+}
+
+void IndexBuffer::create(std::vector<unsigned int>& indices)
+{
+	m_NumIndices = indices.size();
+
+    GL_ASSERT(glGenBuffers(1, &m_ebo));
+	bind();
+    GL_ASSERT(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*m_NumIndices, &indices[0], GL_STATIC_DRAW));
+	unbind();
+}
+
+void IndexBuffer::bind()
+{
+    GL_ASSERT(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo));
+}
+
+void IndexBuffer::unbind()
+{
+	GL_ASSERT(glBindBuffer( GL_ARRAY_BUFFER, 0u));
+}
+
+void IndexBuffer::enable()
+{
+	bind();
+}
+
+void IndexBuffer::disable()
+{
+	unbind();
+}
+
+typedef std::shared_ptr<class BaseMaterial> BaseMaterialPtr;
+typedef std::shared_ptr<class BaseMesh> BaseMeshPtr;
+typedef std::shared_ptr<class ModelAssImp> ModelPtr;
+typedef std::vector<BaseMaterialPtr> BaseMaterialList;
+typedef std::vector<BaseMeshPtr> BaseMeshList;
+
+class BaseMaterial
+{
+public:
+	BaseMaterial()
+	{
+	}
+
+	virtual ~BaseMaterial()
+	{
+		destroy();
+	}
+
+	void initialize();
+	void destroy();
+};
+
+void BaseMaterial::destroy()
+{
+}
+
+class BaseMesh
+{
+public:
+	BaseMesh()
+	{
+	}
+
+	virtual ~BaseMesh()
+	{
+		destroy();
+	}
+
+	void initialize();
+	void destroy();
+	void render();
+
+	int32_t m_MaterialIndex = -1;
+    VertexBuffer m_VertexBuffer;
+	IndexBuffer m_IndexBuffer;
+	BaseMaterialPtr m_Material;
+};
+
+void BaseMesh::initialize()
+{
+}
+
+void BaseMesh::destroy()
+{
+	m_VertexBuffer.destroy();
+	m_IndexBuffer.destroy();
+	m_Material = nullptr;
+}
+
+void BaseMesh::render()
+{
+	if (m_Material)
+	{
+	}
+	m_IndexBuffer.enable();  
+	m_VertexBuffer.enable();  
+	const unsigned int numIndices = m_IndexBuffer.m_NumIndices;
+	GL_ASSERT(glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, 0));
+	m_VertexBuffer.disable();
+	m_IndexBuffer.disable();  
+
+	CHECKGLERROR();
+}
+
+class ModelAssImp
+{
+public:
+	ModelAssImp() 
+	{
+	}
+
+	void create(const std::string& filename);
+	void destroy();
+	void render();
+
+	bool loadFromFile(const std::string& filename);
+
+	BaseMeshList m_Meshes;
+	BaseMaterialList m_Materials;
+};
+
+void ModelAssImp::destroy()
+{
+	m_Meshes.clear();
+	m_Materials.clear();
+}
+
+bool ModelAssImp::loadFromFile(const std::string& filename)
+{
+	Assimp::Importer Importer;
+
+	int postprocess = aiProcess_Triangulate 
+		| aiProcess_GenSmoothNormals 
+		| aiProcess_SplitLargeMeshes
+		| aiProcess_SortByPType
+		| aiProcess_OptimizeMeshes
+		| aiProcess_CalcTangentSpace
+		| aiProcess_JoinIdenticalVertices;
+
+	const aiScene* pScene = Importer.ReadFile(filename.c_str(), postprocess);
+	assert(pScene != nullptr);
+	if (!pScene) return false;
+
+	// material
+	for (uint32_t i = 0; i < pScene->mNumMaterials; i++)
+	{
+
+	}
+
+	for (uint32_t meshIdx = 0; meshIdx < pScene->mNumMeshes; meshIdx++)
+	{
+		const aiMesh* paiMesh = pScene->mMeshes[meshIdx];
+		BaseMeshPtr mesh = std::make_shared<BaseMesh>();
+		mesh->m_MaterialIndex = paiMesh->mMaterialIndex;
+		if (mesh->m_MaterialIndex < m_Materials.size()) 
+			mesh->m_Material = m_Materials[mesh->m_MaterialIndex];
+
+		// vertex buffer
+		VertexBuffer& vb = mesh->m_VertexBuffer;
+		std::vector<glm::vec3>& positions = vb.getPosition();
+		std::vector<glm::vec3>& normals = vb.getNormal();
+		std::vector<glm::vec2>& texcoords = vb.getTexcoord();
+
+		const int NumVertices = paiMesh->mNumVertices;
+		positions.resize(NumVertices);
+		normals.resize(NumVertices);
+		texcoords.resize(NumVertices);
+
+		bool bHasTex = paiMesh->HasTextureCoords(0);
+		const aiVector3D zero(0.f, 0.f, 0.f);
+		for (int i = 0; i < NumVertices; i++)
+		{
+			const aiVector3D& pos = paiMesh->mVertices[i];
+			const aiVector3D& nor = paiMesh->mNormals[i];
+			const aiVector3D& tex = bHasTex ? paiMesh->mTextureCoords[0][i] : zero;
+
+			positions[i] = glm::vec3(pos.x, pos.y, pos.z);
+			normals[i] = glm::vec3(nor.x, nor.y, nor.z);
+			texcoords[i] = glm::vec2(tex.x, tex.y);
+		}
+
+		// Generate buffer's id
+		vb.initialize();  
+
+		// Send data to the GPU
+		vb.complete( GL_STATIC_DRAW );
+
+		// Remove data from the CPU [optional]
+		vb.cleanData();
+
+		// index buffer 
+		const int NumFaces = paiMesh->mNumFaces;
+		std::vector<unsigned int> indices(NumFaces * 3);
+		for (unsigned int i = 0; i < NumFaces; i++) {
+			const aiFace& face = paiMesh->mFaces[i];
+			indices.push_back(face.mIndices[0]); 
+			indices.push_back(face.mIndices[1]); 
+			indices.push_back(face.mIndices[2]); 
+		}
+		mesh->m_IndexBuffer.create(indices);	
+
+		m_Meshes.push_back(mesh);
+	}
+
+	return true;
+}
+
+void ModelAssImp::render()
+{
+	for (auto& mesh : m_Meshes)
+		mesh->render();
+}
+
 struct LightProbe
 {
 	enum Enum
@@ -234,6 +487,7 @@ namespace
 	SkyBox m_skybox;
 	Skydome m_skydome;
 	Settings m_settings;
+	ModelPtr m_bunny;
 
 	LightProbe::Enum m_currentLightProbe;
 
@@ -270,7 +524,114 @@ namespace
 	void glfw_scroll_callback(GLFWwindow* windows, double xoffset, double yoffset);
 }
 
+// Breakpoints that should ALWAYS trigger (EVEN IN RELEASE BUILDS) [x86]!
+#ifdef _MSC_VER
+# define eTB_CriticalBreakPoint() if (IsDebuggerPresent ()) __debugbreak ();
+#else
+# define eTB_CriticalBreakPoint() asm (" int $3");
+#endif
+
 namespace {
+	using namespace std;
+	typedef unsigned long DWORD;
+	template <typename... Args>
+	void eTB_ColorPrintf(uint32_t color, const std::string& fmt, Args... args)
+	{
+		printf(fmt.c_str(), args...);
+	}
+
+	void eTB_FlushConsole()
+	{
+		fflush(stdout);
+	}
+
+	const char* ETB_GL_DEBUG_SOURCE_STR (GLenum source)
+	{
+		static const char* sources [] = {
+			"API",   "Window System", "Shader Compiler", "Third Party", "Application",
+			"Other", "Unknown"
+		};
+
+		int str_idx = min ( size_t(source - GL_DEBUG_SOURCE_API), sizeof (sources) / sizeof (const char *) );
+
+		return sources [str_idx];
+	}
+
+	const char* ETB_GL_DEBUG_TYPE_STR (GLenum type)
+	{
+		static const char* types [] = {
+			"Error",       "Deprecated Behavior", "Undefined Behavior", "Portability",
+			"Performance", "Other",               "Unknown"
+		};
+
+		int str_idx = min ( (size_t)(type - GL_DEBUG_TYPE_ERROR), sizeof (types) / sizeof (const char *) );
+
+		return types [str_idx];
+	}
+
+	const char* ETB_GL_DEBUG_SEVERITY_STR (GLenum severity)
+	{
+		static const char* severities [] = {
+			"High", "Medium", "Low", "Unknown"
+		};
+
+		int str_idx = min ( (size_t)(severity - GL_DEBUG_SEVERITY_HIGH), sizeof(severities)/sizeof(const char *));
+
+		return severities [str_idx];
+	}
+
+	DWORD ETB_GL_DEBUG_SEVERITY_COLOR (GLenum severity)
+	{
+		static DWORD severities [] = {
+			0xff0000ff, // High (Red)
+			0xff00ffff, // Med  (Yellow)
+			0xff00ff00, // Low  (Green)
+			0xffffffff  // ???  (White)
+		};
+
+		int col_idx = min( (size_t)(severity - GL_DEBUG_SEVERITY_HIGH), sizeof(severities)/sizeof(DWORD));
+
+		return severities [col_idx];
+	}
+
+	void ETB_GL_ERROR_CALLBACK (
+			GLenum        source,
+			GLenum        type,
+			GLuint        id,
+			GLenum        severity,
+			GLsizei       length,
+			const GLchar* message,
+			GLvoid*       userParam)
+	{
+		eTB_ColorPrintf (0xff00ffff, "OpenGL Error:\n");
+		eTB_ColorPrintf (0xff808080, "=============\n");
+
+		eTB_ColorPrintf (0xff6060ff, " Object ID: ");
+		eTB_ColorPrintf (0xff0080ff, "%d\n", id);
+
+		eTB_ColorPrintf (0xff60ff60, " Severity:  ");
+		eTB_ColorPrintf ( ETB_GL_DEBUG_SEVERITY_COLOR   (severity),
+				"%s\n",
+				ETB_GL_DEBUG_SEVERITY_STR (severity) );
+
+		eTB_ColorPrintf (0xffddff80, " Type:      ");
+		eTB_ColorPrintf (0xffccaa80, "%s\n", ETB_GL_DEBUG_TYPE_STR     (type));
+
+		eTB_ColorPrintf (0xffddff80, " Source:    ");
+		eTB_ColorPrintf (0xffccaa80, "%s\n", ETB_GL_DEBUG_SOURCE_STR   (source));
+
+		eTB_ColorPrintf (0xffff6060, " Message:   ");
+		eTB_ColorPrintf (0xff0000ff, "%s\n\n", message);
+
+		// Force the console to flush its contents before executing a breakpoint
+		eTB_FlushConsole ();
+
+		// Trigger a breakpoint in gDEBugger...
+		glFinish ();
+
+		// Trigger a breakpoint in traditional debuggers...
+		eTB_CriticalBreakPoint ();
+	}
 
 	typedef std::vector<std::istream::char_type> ByteArray;
 	ByteArray ReadFileSync( const std::string& name )
@@ -324,15 +685,14 @@ namespace {
 
         Timer::getInstance().start();
 
-
-        GLuint VertexArrayID;
-        GL_ASSERT(glGenVertexArrays(1, &VertexArrayID));
-        GL_ASSERT(glBindVertexArray(VertexArrayID));
-
         m_program.initalize();
         m_program.addShader( GL_VERTEX_SHADER, "Default.Vertex");
         m_program.addShader( GL_FRAGMENT_SHADER, "Default.Fragment");
         m_program.link();  
+
+        GLuint m_VertexArrayID;
+        GL_ASSERT(glGenVertexArrays(1, &m_VertexArrayID));
+        GL_ASSERT(glBindVertexArray(m_VertexArrayID));
 
         m_mesh.init();
 
@@ -345,6 +705,9 @@ namespace {
 		// m_skybox.addCubemap( "resource/MountainPath/*.jpg" );
 	#endif
 		m_skybox.setCubemap( 0u );
+
+		m_bunny = std::make_shared<ModelAssImp>();
+		m_bunny->loadFromFile( "resource/Meshes/bunny.ply" );
 	}
 
 	void initExtension()
@@ -374,6 +737,23 @@ namespace {
 			glGetString(GL_VERSION)    // e.g. 3.2 INTEL-8.0.61
         );
 
+		// SUPER VERBOSE DEBUGGING!
+		if (glDebugMessageControlARB != NULL) {
+			glEnable                  (GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
+			glDebugMessageControlARB  (GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
+			glDebugMessageCallbackARB ((GLDEBUGPROCARB)ETB_GL_ERROR_CALLBACK, NULL);
+		}
+
+		GLint flags; 
+		glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+		if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
+		{
+			glEnable(GL_DEBUG_OUTPUT);
+			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+			glDebugMessageCallback((GLDEBUGPROCARB)ETB_GL_ERROR_CALLBACK, nullptr);
+			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+		}
+
         glClearColor( 0.15f, 0.15f, 0.15f, 0.0f);
 
         glEnable( GL_DEPTH_TEST );
@@ -398,8 +778,9 @@ namespace {
 			exit( EXIT_FAILURE );
 		}
 		glfwWindowHint(GLFW_SAMPLES, 4);
+		// glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
@@ -423,6 +804,7 @@ namespace {
 
 	void finalizeApp()
 	{
+		m_bunny->destroy();
         glswShutdown();  
         m_program.destroy();
         m_mesh.destroy();
@@ -600,6 +982,7 @@ namespace {
 				NULL, 
 				ImVec2(width / 5.0f, 450.f),
 				ImGuiWindowFlags_AlwaysAutoResize);
+
 		ImGui::Text("Mesh:");
 		ImGui::Indent();
 		ImGui::RadioButton("Bunny", &m_settings.m_meshSelection, 0);
@@ -676,7 +1059,9 @@ namespace {
         cubemap->bind(0u);
         m_mesh.draw();
         cubemap->unbind(0u);
+		m_bunny->render();
         m_program.unbind();
+
 
 		renderHUD();
     }
@@ -774,7 +1159,6 @@ namespace {
 	{
 		ImGui_ImplGlfwGL3_ScrollCallback(windows, xoffset, yoffset);
 	}
-
 }
 
 int main(int argc, char** argv)

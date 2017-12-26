@@ -341,8 +341,8 @@ namespace {
 		m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
 
-		m_lightProbes[LightProbe::Bolonga].load("bolonga");
-		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
+		// m_lightProbes[LightProbe::Bolonga].load("bolonga");
+		// m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
 	}
 
 	void initExtension()

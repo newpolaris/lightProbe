@@ -7,6 +7,7 @@
 
 #include <cassert>
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL 1
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
 

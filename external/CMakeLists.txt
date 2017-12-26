@@ -190,3 +190,7 @@ endif(WIN32)
 
 ### ImGUI ###
 add_subdirectory(ImGUI)
+
+### NV_DDS ###
+include_directories( nv_dds )
+add_library( nv_dds STATIC nv_dds/nv_dds.cpp)

@@ -24,6 +24,16 @@
 #endif
 #define GL_ASSERT(x) {x; CHECKGLERROR()}
 
+#ifndef _countof
+	#define _countof(x) __countof(x)
+#endif
+
+template < typename T, size_t N >
+size_t __countof( T (&arr)[N] )
+{
+    return std::extent<T[N]>::value;
+}
+
 namespace gltools
 {
   const   char* getGLErrorString(GLenum err);

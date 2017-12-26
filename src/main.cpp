@@ -53,6 +53,21 @@ struct LightProbe
 
 		Count
 	};
+
+	void load(const std::string& name)
+	{
+		char filePath[512];
+		std::snprintf(filePath, _countof(filePath), "resource/%s_lod.dds", name.c_str());
+		m_Tex.initialize();
+		m_Tex.load(filePath);
+
+		std::snprintf(filePath, _countof(filePath), "resource/%s_irr.dds", name.c_str());
+		m_TexIrr.initialize();
+		m_TexIrr.load(filePath);
+	}
+
+	Texture2D m_Tex;
+	Texture2D m_TexIrr;
 };
 
 struct Settings
@@ -134,6 +149,7 @@ namespace
 	Settings m_settings;
 	ModelPtr m_bunny;
 
+	LightProbe m_lightProbes[LightProbe::Count];
 	LightProbe::Enum m_currentLightProbe;
 
     //?
@@ -324,6 +340,9 @@ namespace {
 		m_bunny = std::make_shared<ModelAssImp>();
 		m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
+
+		m_lightProbes[LightProbe::Bolonga].load("bolonga");
+		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
 	}
 
 	void initExtension()

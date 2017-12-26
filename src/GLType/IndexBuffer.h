@@ -20,7 +20,7 @@ public:
 	void enable();
 	void disable();
 
-	GLuint m_ebo = 0;
+	GLuint m_ibo = 0;
 	unsigned int m_NumIndices = 0;
 };
 

@@ -34,6 +34,7 @@
 
 #include <GLType/ProgramShader.h>
 #include <GLType/Texture.h>
+#include <GLType/BaseTexture.h>
 #include <SkyBox.h>
 #include <Skydome.h>
 #include <Mesh.h>
@@ -58,16 +59,14 @@ struct LightProbe
 	{
 		char filePath[512];
 		std::snprintf(filePath, _countof(filePath), "resource/%s_lod.dds", name.c_str());
-		m_Tex.initialize();
-		m_Tex.load(filePath);
+		m_Tex.create(filePath);
 
 		std::snprintf(filePath, _countof(filePath), "resource/%s_irr.dds", name.c_str());
-		m_TexIrr.initialize();
-		m_TexIrr.load(filePath);
+		m_TexIrr.create(filePath);
 	}
 
-	Texture2D m_Tex;
-	Texture2D m_TexIrr;
+	BaseTexture m_Tex;
+	BaseTexture m_TexIrr;
 };
 
 struct Settings
@@ -339,8 +338,8 @@ namespace {
 		m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
 
-		// m_lightProbes[LightProbe::Bolonga].load("bolonga");
-		// m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
+		m_lightProbes[LightProbe::Bolonga].load("bolonga");
+		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
 	}
 
 	void initExtension()
@@ -372,11 +371,11 @@ namespace {
 
     #if _DEBUG
         glEnable(GL_DEBUG_OUTPUT);
-        if(glDebugMessageCallback){
+        if (glDebugMessageCallback) {
             cout << "Register OpenGL debug callback " << endl;
-            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
             glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
             glDebugMessageCallback(OpenglCallbackFunction, nullptr);
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         }
         else
             cout << "glDebugMessageCallback not available" << endl;

@@ -1,4 +1,4 @@
-prefix=C:/Program Files (x86)/IrradianceEnvMap
+prefix=/usr/local
 exec_prefix=${prefix}
 includedir=${prefix}/include
 libdir=${exec_prefix}/lib
@@ -9,5 +9,5 @@ Version: 3.1.2
 URL: http://www.glfw.org/
 Requires.private: 
 Libs: -L${libdir} -lglfw3
-Libs.private:  -lgdi32 -lopengl32
+Libs.private:  -framework Cocoa -framework OpenGL -framework IOKit -framework CoreFoundation -framework CoreVideo
 Cflags: -I${includedir}

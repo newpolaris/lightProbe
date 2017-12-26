@@ -9,7 +9,7 @@
 #include <cassert>
 #include <tools/ImageLoader.hpp>
 #include <tools/Timer.hpp>
-#include <nv_dds/nv_dds.h>
+#include <gli/gli.hpp>
 #include "irradianceEnvMap.h"
 #include "Texture.h"
 
@@ -77,9 +77,9 @@ bool Texture2D::load(const std::string &name)
 
 		if (extension == ".dds")
 		{
-			nv_dds::CDDSImage image;
-			image.load(name);
-			image.upload_texture2D();   
+			//nv_dds::CDDSImage image;
+			//image.load(name);
+			//image.upload_texture2D();   
 		}
 		else
 		{
@@ -169,9 +169,9 @@ bool TextureCubemap::load(const std::string &name)
 
 	if (extension == ".dds")
 	{
-		nv_dds::CDDSImage image;
-		image.load(name);
-		image.upload_textureCubemap();   
+//        nv_dds::CDDSImage image;
+//        image.load(name);
+//        image.upload_textureCubemap();   
 	}
 	else
 	{

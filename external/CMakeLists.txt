@@ -2,7 +2,6 @@ if(MSVC AND NOT "${MSVC_VERSION}" LESS 1400)
 	add_definitions( "/MP" )
 endif()
 
-
 add_definitions(
 	-DTW_STATIC
 	-DTW_NO_LIB_PRAGMA
@@ -192,5 +191,13 @@ endif(WIN32)
 add_subdirectory(ImGUI)
 
 ### NV_DDS ###
-include_directories( nv_dds )
-add_library( nv_dds STATIC nv_dds/nv_dds.cpp)
+if (UseNVDDS)
+	# supoort : DXTC1, DXTC3, DXTC5, RGB (888, 888X), and RGBA (8888)
+	include_directories( nv_dds )
+	add_library( nv_dds STATIC nv_dds/nv_dds.cpp)
+endif(UseNVDDS)
+
+### GLI ###
+if (UseGLI)
+	add_subdirectory(gli)
+endif(UseGLI)

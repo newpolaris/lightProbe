@@ -43,7 +43,8 @@ class SkyBox
         m_Program(0),
         m_CubeMesh(0),
         m_curIdx(0u),
-        
+        m_rotateMatrix(1.f),
+        m_invRotateMatrix(1.f),
         m_bAutoRotation(false),
         m_spin(0.0f)
     {}

@@ -110,7 +110,6 @@ namespace gltools
     }
   }
 
-
   GLint getShaderError( GLuint shader, GLenum pname )
   {
     GLint params;    

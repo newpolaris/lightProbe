@@ -141,6 +141,8 @@ namespace
 	GLFWwindow* window = nullptr;  
 
     ProgramShader m_program;
+    ProgramShader m_programMesh;
+    ProgramShader m_programSky;
 	std::shared_ptr<Texture2D> m_texture;
     SphereMesh m_mesh( 48, 5.0f);
 	SkyBox m_skybox;
@@ -155,6 +157,7 @@ namespace
 
     TCamera camera;
 
+    GLuint m_EmptyVAO = 0;
     bool bWireframe = false;
 
     //?
@@ -166,11 +169,6 @@ namespace
     void finalizeApp();
 	void mainLoopApp();
     void moveCamera( int key, bool isPressed );
-	void handleInput();
-    void handleKeyboard(float delta);
-	void prefilter(fRGB* im, int width, int height);
-	void printcoeffs();
-	void tomatrix();
     void render();
 	void renderHUD();
 	void update();
@@ -185,12 +183,6 @@ namespace
 }
 
 // Breakpoints that should ALWAYS trigger (EVEN IN RELEASE BUILDS) [x86]!
-#ifdef _MSC_VER
-# define eTB_CriticalBreakPoint() if (IsDebuggerPresent ()) __debugbreak ();
-#else
-# define eTB_CriticalBreakPoint() asm (" int $3");
-#endif
-
 #ifdef _MSC_VER
 #define DEBUG_BREAK __debugbreak()
 #else 
@@ -277,6 +269,18 @@ namespace {
 		return buf;
 	}
 
+    glm::mat4 envViewMtx()
+    {
+        glm::vec3 toTargetNorm = camera.getDirection();
+        glm::vec3 fakeUp { 0, 1, 0 };
+        glm::vec3 right = glm::cross(fakeUp, toTargetNorm);
+        glm::vec3 up = glm::cross(toTargetNorm, right);
+        return glm::mat4( 
+            glm::vec4(right, 0), 
+            glm::vec4(up, 0),
+            glm::vec4(toTargetNorm, 0),
+            glm::vec4(0, 0, 0, 1));
+    }
 
 	void initApp(int argc, char** argv)
 	{
@@ -340,6 +344,17 @@ namespace {
 
 		m_lightProbes[LightProbe::Bolonga].load("bolonga");
 		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
+        m_currentLightProbe = LightProbe::Bolonga;
+
+        m_programMesh.initalize();
+        m_programMesh.addShader(GL_VERTEX_SHADER, "Default.Vertex");
+        m_programMesh.addShader(GL_FRAGMENT_SHADER, "Default.Fragment");
+        m_programMesh.link();  
+
+        m_programSky.initalize();
+        m_programSky.addShader(GL_VERTEX_SHADER, "IblSkyBox.Vertex");
+        m_programSky.addShader(GL_FRAGMENT_SHADER, "IblSkyBox.Fragment");
+        m_programSky.link();  
 	}
 
 	void initExtension()
@@ -393,6 +408,8 @@ namespace {
         glFrontFace(GL_CCW);
 
         glDisable( GL_MULTISAMPLE );
+
+        glGenVertexArrays(1, &m_EmptyVAO);
 	}
 
 	void initWindow(int argc, char** argv)
@@ -433,6 +450,8 @@ namespace {
 		m_bunny->destroy();
         glswShutdown();  
         m_program.destroy();
+        m_programMesh.destroy();
+        m_programSky.destroy();
         m_mesh.destroy();
         m_texture->destroy();
 		m_skydome.shutdown();
@@ -685,14 +704,29 @@ namespace {
 
         cubemap->bind(0u);
         m_mesh.draw();
-
         mvp = camera.getViewProjMatrix() * modelMatrix;
 		m_program.setUniform( "uModelMatrix", modelMatrix);
         m_program.setUniform( "uModelViewProjMatrix", mvp );
 		m_bunny->render();
-
         cubemap->unbind(0u);
         m_program.unbind();
+
+        m_lightProbes->m_Tex.bind(0);
+        m_lightProbes->m_TexIrr.bind(1);
+        m_programSky.bind();
+
+        mvp = camera.getViewProjMatrix();
+        m_programSky.setUniform( "uViewRect", glm::vec4(0, 0, display_w, display_h));
+        m_programSky.setUniform( "uModelViewProjMatrix", mvp );
+        m_programSky.setUniform( "uEnvViewMatrix", envViewMtx() );
+
+        // screen quad
+        glBindVertexArray(m_EmptyVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        m_programSky.unbind();
+        m_lightProbes->m_Tex.unbind(0);
+        m_lightProbes->m_TexIrr.unbind(1);
 
 		renderHUD();
     }

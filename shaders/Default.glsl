@@ -48,8 +48,7 @@ vec3 computeIrradiance( vec3 normal, mat4 M[3])
 void main()
 {
   // Clip Space position
-  vec4 position2 = uModelViewProjMatrix * inPosition;
-  gl_Position = position2 / position2.w;
+  gl_Position = uModelViewProjMatrix * inPosition;
 
   // World Space normal
   vNormalWS = normalize( uNormalMatrix * inNormal );

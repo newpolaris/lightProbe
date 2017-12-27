@@ -347,8 +347,8 @@ namespace {
         m_currentLightProbe = LightProbe::Bolonga;
 
         m_programMesh.initalize();
-        m_programMesh.addShader(GL_VERTEX_SHADER, "Default.Vertex");
-        m_programMesh.addShader(GL_FRAGMENT_SHADER, "Default.Fragment");
+        m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
+        m_programMesh.addShader(GL_FRAGMENT_SHADER, "IblMesh.Fragment");
         m_programMesh.link();  
 
         m_programSky.initalize();
@@ -677,54 +677,25 @@ namespace {
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
-		m_skybox.render( camera );
-		// m_skydome.render( camera );
-
         // Use our shader
-        m_program.bind();
-
-        glm::mat4 modelMatrix = m_mesh.getModelMatrix();
-        glm::mat4 mvp = camera.getViewProjMatrix() * modelMatrix;
-        m_program.setUniform( "uModelViewProjMatrix", mvp );
-
-		// Vertex uniforms
-		m_program.setUniform( "uModelMatrix", modelMatrix);
-		m_program.setUniform( "uNormalMatrix", m_mesh.getNormalMatrix());
-		m_program.setUniform( "uEyePosWS", camera.getPosition());
-		m_program.setUniform( "uInvSkyboxRotation", m_skybox.getInvRotateMatrix() );
-		TextureCubemap *cubemap = m_skybox.getCurrentCubemap();
-
-		if (cubemap->hasSphericalHarmonics())
-		{
-			glm::mat4* matrix = cubemap->getSHMatrices();
-			m_program.setUniform( "uIrradianceMatrix[0]", matrix[0]);
-			m_program.setUniform( "uIrradianceMatrix[1]", matrix[1]);
-			m_program.setUniform( "uIrradianceMatrix[2]", matrix[2]);
-		}
-
-        cubemap->bind(0u);
-        m_mesh.draw();
-        mvp = camera.getViewProjMatrix() * modelMatrix;
-		m_program.setUniform( "uModelMatrix", modelMatrix);
-        m_program.setUniform( "uModelViewProjMatrix", mvp );
-		m_bunny->render();
-        cubemap->unbind(0u);
-        m_program.unbind();
-
         m_lightProbes->m_Tex.bind(0);
         m_lightProbes->m_TexIrr.bind(1);
+
         m_programSky.bind();
-
-        mvp = camera.getViewProjMatrix();
         m_programSky.setUniform( "uViewRect", glm::vec4(0, 0, display_w, display_h));
-        m_programSky.setUniform( "uModelViewProjMatrix", mvp );
+        m_programSky.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
         m_programSky.setUniform( "uEnvViewMatrix", envViewMtx() );
-
         // screen quad
         glBindVertexArray(m_EmptyVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-
+        // glDrawArrays(GL_TRIANGLES, 0, 3);
         m_programSky.unbind();
+
+        m_programMesh.bind();
+        m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
+		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
+		m_bunny->render();
+        m_programMesh.unbind();
+
         m_lightProbes->m_Tex.unbind(0);
         m_lightProbes->m_TexIrr.unbind(1);
 

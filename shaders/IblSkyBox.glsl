@@ -26,7 +26,7 @@ void main()
 	vec2 texCoord;
 	texCoord.x = (x+1.0)*0.5;
 	texCoord.y = (y+1.0)*0.5;
-	gl_Position = vec4(x, y, 0, 1);
+	gl_Position = vec4(x, y, 1, 1);
 
 	float fov = radians(45.0);
 	float height = tan(fov*0.5);

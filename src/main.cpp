@@ -171,12 +171,6 @@ namespace
 
 // Breakpoints that should ALWAYS trigger (EVEN IN RELEASE BUILDS) [x86]!
 #ifdef _MSC_VER
-# define eTB_CriticalBreakPoint() if (IsDebuggerPresent ()) __debugbreak ();
-#else
-# define eTB_CriticalBreakPoint() asm (" int $3");
-#endif
-
-#ifdef _MSC_VER
 #define DEBUG_BREAK __debugbreak()
 #else 
 #include <signal.h>
@@ -244,6 +238,7 @@ void APIENTRY OpenglCallbackFunction(GLenum source,
 
 namespace {
 	using namespace std;
+
 
 	typedef std::vector<std::istream::char_type> ByteArray;
 	ByteArray ReadFileSync( const std::string& name )
@@ -319,7 +314,7 @@ namespace {
 		m_skybox.setCubemap( 0u );
 
 		m_bunny = std::make_shared<ModelAssImp>();
-		m_bunny->create();
+        m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
 	}
 
@@ -352,11 +347,11 @@ namespace {
 
     #if _DEBUG
         glEnable(GL_DEBUG_OUTPUT);
-        if(glDebugMessageCallback){
+        if (glDebugMessageCallback) {
             cout << "Register OpenGL debug callback " << endl;
-            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
             glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
             glDebugMessageCallback(OpenglCallbackFunction, nullptr);
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         }
         else
             cout << "glDebugMessageCallback not available" << endl;
@@ -385,9 +380,9 @@ namespace {
 			exit( EXIT_FAILURE );
 		}
 		glfwWindowHint(GLFW_SAMPLES, 4);
-		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
@@ -639,7 +634,7 @@ namespace {
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
-		m_skybox.render( camera );
+		// m_skybox.render( camera );
 		// m_skydome.render( camera );
 
         // Use our shader
@@ -665,9 +660,8 @@ namespace {
 		}
 
         cubemap->bind(0u);
-        m_mesh.draw();
+        // m_mesh.draw();
 
-        modelMatrix = glm::scale(glm::mat4(1), glm::vec3(5, 5, 5));
         mvp = camera.getViewProjMatrix() * modelMatrix;
 		m_program.setUniform( "uModelMatrix", modelMatrix);
         m_program.setUniform( "uModelViewProjMatrix", mvp );

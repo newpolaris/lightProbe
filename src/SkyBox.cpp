@@ -20,8 +20,15 @@
     
 SkyBox::~SkyBox()
 {
+  shutdown();
+}
+
+void SkyBox::shutdown()
+{
   if (0 != m_Program) delete m_Program;
+  m_Program = 0;
   if (0 != m_CubeMesh) delete m_CubeMesh;
+  m_CubeMesh = 0;
     
   if (false == m_cubemaps.empty())
   {
@@ -31,9 +38,10 @@ SkyBox::~SkyBox()
       delete *it;
     }
   }
+  m_cubemaps.clear();
 }
 
-void SkyBox::init()
+void SkyBox::initialize()
 {
   assert( false == m_bInitialized );
   

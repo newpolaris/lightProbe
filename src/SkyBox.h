@@ -51,7 +51,8 @@ class SkyBox
     
     virtual ~SkyBox();
     
-    void init();
+    void initialize();
+	void shutdown();
     void render(const TCamera& camera);
     
     void addCubemap( const std::string &name );
@@ -59,7 +60,6 @@ class SkyBox
     
     TextureCubemap* getCurrentCubemap() { return m_cubemaps[m_curIdx]; }//
     TextureCubemap* getCubemap( size_t idx ) { return m_cubemaps[idx]; }//
-    
     
     //-------------------------------------------------
     void toggleAutoRotate() {m_bAutoRotation = !m_bAutoRotation;}

@@ -15,10 +15,9 @@
 #include <tools/gltools.hpp>
 #include <tools/Timer.hpp>
 #include <GLType/ProgramShader.h>
-#include <GLType/Texture.h>
+#include <GLType/BaseTexture.h>
 #include "Mesh.h"
 #include "Skydome.h"
-
 
 Skydome::~Skydome()
 {
@@ -106,12 +105,11 @@ void Skydome::setTexture( const std::string &name )
 {
 	assert( m_bInitialized );
 
-	m_texture = std::make_shared<Texture2D>();
-	m_texture->initialize();
-	m_texture->load( name );  
+	m_texture = std::make_shared<BaseTexture>();
+	m_texture->create( name );  
 }
 
-void Skydome::setTexture( std::shared_ptr<Texture2D>& texture )
+void Skydome::setTexture( std::shared_ptr<BaseTexture>& texture )
 {
 	m_texture = texture;
 }

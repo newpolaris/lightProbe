@@ -15,6 +15,7 @@ class TCamera;
 class ProgramShader;
 class SphereMesh;
 class Texture2D;
+class BaseTexture;
 
 class Skydome
 {
@@ -23,7 +24,7 @@ class Skydome
     
     ProgramShader *m_Program;
     SphereMesh *m_SphereMesh;
-	std::shared_ptr<Texture2D> m_texture;
+	  std::shared_ptr<BaseTexture> m_texture;
     
     //-------------------------------------------------
     bool m_bAutoRotation;
@@ -49,7 +50,7 @@ class Skydome
     void render(const TCamera& camera);
     
     void setTexture( const std::string &name );
-    void setTexture( std::shared_ptr<Texture2D>& texture );
+    void setTexture( std::shared_ptr<BaseTexture>& texture );
     
     //-------------------------------------------------
     void toggleAutoRotate() {m_bAutoRotation = !m_bAutoRotation;}

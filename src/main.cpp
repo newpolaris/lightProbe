@@ -36,7 +36,6 @@
 #include <GLType/Texture.h>
 #include <GLType/BaseTexture.h>
 #include <SkyBox.h>
-#include <Skydome.h>
 #include <Mesh.h>
 #include <ModelAssImp.h>
 
@@ -143,11 +142,10 @@ namespace
     ProgramShader m_program;
     ProgramShader m_programMesh;
     ProgramShader m_programSky;
-	std::shared_ptr<Texture2D> m_texture;
+	std::shared_ptr<BaseTexture> m_texture;
     SphereMesh m_sphere( 48, 5.0f );
     FullscreenTriangleMesh m_triangle;
 	SkyBox m_skybox;
-	Skydome m_skydome;
 	Settings m_settings;
 	ModelPtr m_bunny;
 
@@ -330,14 +328,10 @@ namespace {
         m_sphere.init();
 		m_triangle.init();
 
-		m_texture = std::make_shared<Texture2D>();
-        m_texture->initialize();
+		m_texture = std::make_shared<BaseTexture>();
 
-		m_skybox.init();
+		m_skybox.initialize();
 		m_skybox.addCubemap( "resource/Cube/*.bmp" );
-	#if !_DEBUG
-		// m_skybox.addCubemap( "resource/MountainPath/*.jpg" );
-	#endif
 		m_skybox.setCubemap( 0u );
 
 		m_bunny = std::make_shared<ModelAssImp>();
@@ -457,7 +451,7 @@ namespace {
         m_sphere.destroy();
 		m_triangle.destroy();
         m_texture->destroy();
-		m_skydome.shutdown();
+		m_skybox.shutdown();
         Logger::getInstance().close();
 		ImGui_ImplGlfwGL3_Shutdown();
 		glfwTerminate();
@@ -680,16 +674,11 @@ namespace {
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
+		m_skybox.render(camera);
+
         // Use our shader
         m_lightProbes->m_Tex.bind(0);
         m_lightProbes->m_TexIrr.bind(1);
-
-        m_programSky.bind();
-        m_programSky.setUniform( "uViewRect", glm::vec4(0, 0, display_w, display_h));
-        m_programSky.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
-        m_programSky.setUniform( "uEnvViewMatrix", envViewMtx() );
-		m_triangle.draw(); // full screen triangle
-        m_programSky.unbind();
 
         m_programMesh.bind();
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );

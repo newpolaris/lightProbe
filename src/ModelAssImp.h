@@ -1,6 +1,6 @@
 #include <memory>
-#include <GLType/IndexBuffer.h>
-#include <GLType/VertexBuffer.h>
+#include <vector>
+#include <GL/glew.h>
 
 typedef std::shared_ptr<class BaseMaterial> BaseMaterialPtr;
 typedef std::shared_ptr<class BaseMesh> BaseMeshPtr;
@@ -43,8 +43,6 @@ public:
 
     uint32_t m_NumIndices = 0;
 	int32_t m_MaterialIndex = -1;
-    VertexBuffer m_VertexBuffer;
-	IndexBuffer m_IndexBuffer;
 	BaseMaterialPtr m_Material;
 };
 
@@ -60,6 +58,10 @@ public:
 	void render();
 
 	bool loadFromFile(const std::string& filename);
+
+    GLuint m_vao;
+    GLuint m_vbo[3];    
+    GLuint m_ibo;
 
 	BaseMeshList m_Meshes;
 	BaseMaterialList m_Materials;

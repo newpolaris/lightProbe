@@ -431,3 +431,47 @@ void CubeMesh::draw() const
   
   CHECKGLERROR();
 }
+
+/** FULL SCREEN TRIANGLE MESH -------------------------- */
+
+void FullscreenTriangleMesh::init()
+{
+  assert( !m_bInitialized );
+  m_bInitialized = true;
+  
+  m_count = 3;
+    
+  std::vector<glm::vec3> &positions = m_vertexBuffer.getPosition();
+  std::vector<glm::vec3> &normals   = m_vertexBuffer.getNormal();
+  std::vector<glm::vec2> &texCoords = m_vertexBuffer.getTexcoord();
+    
+  positions.resize( m_count );
+  normals.resize( m_count, glm::vec3( 0.0f, 0.0f, -1.0f) );
+  texCoords.resize( m_count );
+    
+	positions[0] = glm::vec3(-1, -1, 0);
+	positions[1] = glm::vec3(3, -1, 0);
+	positions[2] = glm::vec3(-1, 3, 0);
+
+  texCoords[0] = glm::vec2(0, 0);
+  texCoords[1] = glm::vec2(2, 0);
+  texCoords[2] = glm::vec2(0, 2);
+  
+  m_vertexBuffer.initialize();  
+  m_vertexBuffer.complete( GL_STATIC_DRAW );
+  m_vertexBuffer.cleanData();
+  
+  CHECKGLERROR();
+}
+
+
+void FullscreenTriangleMesh::draw() const
+{
+  assert( m_bInitialized );    
+  
+  m_vertexBuffer.enable();
+    glDrawArrays( GL_TRIANGLES, 0, m_count);
+  m_vertexBuffer.disable(); 
+  
+  CHECKGLERROR();
+}

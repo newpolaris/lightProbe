@@ -101,7 +101,7 @@ struct Settings
 		m_showDiffColorWheel = true;
 		m_showSpecColorWheel = true;
 		m_metalOrSpec = 0;
-		m_meshSelection = 0;
+		m_sphereSelection = 0;
 	}
 
 	float m_envRotCurr;
@@ -124,7 +124,7 @@ struct Settings
 	bool  m_showDiffColorWheel;
 	bool  m_showSpecColorWheel;
 	int32_t m_metalOrSpec;
-	int32_t m_meshSelection;
+	int32_t m_sphereSelection;
 };
 
 
@@ -134,7 +134,7 @@ namespace
 		float r, g, b; 
 	};
     const unsigned int WINDOW_WIDTH = 1280;
-    const unsigned int WINDOW_HEIGHT = 960;
+    const unsigned int WINDOW_HEIGHT = 720;
 	const char* WINDOW_NAME = "Irradiance Environment Mapping";
 
 	bool bCloseApp = false;
@@ -144,7 +144,8 @@ namespace
     ProgramShader m_programMesh;
     ProgramShader m_programSky;
 	std::shared_ptr<Texture2D> m_texture;
-    SphereMesh m_mesh( 48, 5.0f);
+    SphereMesh m_sphere( 48, 5.0f );
+    FullscreenTriangleMesh m_triangle;
 	SkyBox m_skybox;
 	Skydome m_skydome;
 	Settings m_settings;
@@ -187,7 +188,7 @@ namespace
 #define DEBUG_BREAK __debugbreak()
 #else 
 #include <signal.h>
-// raise(SIGTRAP);
+#define DEBUG_BREAK raise(SIGTRAP)
 // __builtin_trap() 
 #endif
 
@@ -326,7 +327,8 @@ namespace {
         GL_ASSERT(glGenVertexArrays(1, &m_VertexArrayID));
         GL_ASSERT(glBindVertexArray(m_VertexArrayID));
 
-        m_mesh.init();
+        m_sphere.init();
+		m_triangle.init();
 
 		m_texture = std::make_shared<Texture2D>();
         m_texture->initialize();
@@ -423,7 +425,7 @@ namespace {
 		glfwWindowHint(GLFW_SAMPLES, 4);
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
@@ -452,7 +454,8 @@ namespace {
         m_program.destroy();
         m_programMesh.destroy();
         m_programSky.destroy();
-        m_mesh.destroy();
+        m_sphere.destroy();
+		m_triangle.destroy();
         m_texture->destroy();
 		m_skydome.shutdown();
         Logger::getInstance().close();
@@ -630,11 +633,11 @@ namespace {
 
 		ImGui::Text("Mesh:");
 		ImGui::Indent();
-		ImGui::RadioButton("Bunny", &m_settings.m_meshSelection, 0);
-		ImGui::RadioButton("Orbs",  &m_settings.m_meshSelection, 1);
+		ImGui::RadioButton("Bunny", &m_settings.m_sphereSelection, 0);
+		ImGui::RadioButton("Orbs",  &m_settings.m_sphereSelection, 1);
 		ImGui::Unindent();
 
-		const bool isBunny = (0 == m_settings.m_meshSelection);
+		const bool isBunny = (0 == m_settings.m_sphereSelection);
 		if (!isBunny)
 		{
 			m_settings.m_metalOrSpec = 0;
@@ -685,9 +688,7 @@ namespace {
         m_programSky.setUniform( "uViewRect", glm::vec4(0, 0, display_w, display_h));
         m_programSky.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
         m_programSky.setUniform( "uEnvViewMatrix", envViewMtx() );
-        // screen quad
-        glBindVertexArray(m_EmptyVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+		m_triangle.draw(); // full screen triangle
         m_programSky.unbind();
 
         m_programMesh.bind();

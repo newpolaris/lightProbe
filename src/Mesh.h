@@ -131,5 +131,17 @@ class CubeMesh : public Mesh
     void draw() const;
 };
 
+/** FULL SCREEN TRIANGLE MESH -------------------------- */
+
+class FullscreenTriangleMesh : public Mesh
+{
+	public:
+		FullscreenTriangleMesh()
+	    : Mesh()
+		{}
+
+		void init();
+		void draw() const;
+};
 
 #endif //MESH_HPP

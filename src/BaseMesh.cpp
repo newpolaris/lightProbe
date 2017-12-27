@@ -15,7 +15,13 @@ void BaseMesh::render()
 	if (m_Material)
 	{
 	}
-	glDrawElements(GL_TRIANGLES, m_NumIndices, GL_UNSIGNED_INT, 0);
+
+	GL_ASSERT(glDrawElementsBaseVertex(
+				GL_TRIANGLES,
+				m_IndexCount, 
+				GL_UNSIGNED_INT,
+				(void*)(sizeof(unsigned int)*m_IndexBase), 
+				m_VertexBase));
 
 	CHECKGLERROR();
 }

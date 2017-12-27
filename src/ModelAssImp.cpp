@@ -96,7 +96,9 @@ bool ModelAssImp::loadFromFile(const std::string& filename)
 			indices.push_back(face.mIndices[1]); 
 			indices.push_back(face.mIndices[2]); 
 		}
-        mesh->m_NumIndices = indices.size();
+        mesh->m_IndexCount = indices.size();
+        mesh->m_IndexBase = 0;
+        mesh->m_VertexBase = 0;
 
 		m_Meshes.push_back(mesh);
 

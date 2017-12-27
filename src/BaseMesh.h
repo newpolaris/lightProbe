@@ -18,7 +18,9 @@ public:
 	void destroy();
 	void render();
 
-    uint32_t m_NumIndices = 0;
 	int32_t m_MaterialIndex = -1;
+	unsigned int m_IndexBase = 0;
+	unsigned int m_IndexCount = 0;
+	unsigned int m_VertexBase = 0;
 	BaseMaterialPtr m_Material;
 };

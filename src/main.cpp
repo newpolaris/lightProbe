@@ -314,6 +314,7 @@ namespace {
 		m_skybox.setCubemap( 0u );
 
 		m_bunny = std::make_shared<ModelAssImp>();
+        m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
 	}
 

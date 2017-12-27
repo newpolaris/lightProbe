@@ -331,7 +331,7 @@ namespace {
 		m_texture = std::make_shared<BaseTexture>();
 
 		m_skybox.initialize();
-		m_skybox.addCubemap( "resource/Cube/*.bmp" );
+		m_skybox.addCubemap( "resource/Cube/cubemap.dds" );
 		m_skybox.setCubemap( 0u );
 
 		m_bunny = std::make_shared<ModelAssImp>();

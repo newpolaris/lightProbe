@@ -14,6 +14,7 @@
 #include <tools/Timer.hpp>
 #include <GLType/ProgramShader.h>
 #include <GLType/Texture.h>
+#include <GLType/BaseTexture.h>
 #include "Mesh.h"
 #include "SkyBox.h"
 
@@ -29,15 +30,6 @@ void SkyBox::shutdown()
   m_Program = 0;
   if (0 != m_CubeMesh) delete m_CubeMesh;
   m_CubeMesh = 0;
-    
-  if (false == m_cubemaps.empty())
-  {
-    std::vector<TextureCubemap*>::iterator it;
-    for (it=m_cubemaps.begin(); it!=m_cubemaps.end(); ++it)
-    {
-      delete *it;
-    }
-  }
   m_cubemaps.clear();
 }
 
@@ -120,9 +112,8 @@ void SkyBox::addCubemap( const std::string &name )
 {
   assert( m_bInitialized );
   
-  TextureCubemap *cubemap = new TextureCubemap();
-  cubemap->initialize();
-  cubemap->load( name );  
+  auto cubemap = std::make_shared<BaseTexture>();
+  cubemap->create( name );  
   m_cubemaps.push_back( cubemap );
 }
 

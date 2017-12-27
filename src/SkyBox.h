@@ -16,7 +16,6 @@
 class TCamera;
 class ProgramShader;
 class CubeMesh;
-class TextureCubemap;
 
 class SkyBox
 {
@@ -26,7 +25,7 @@ class SkyBox
     ProgramShader *m_Program;
     CubeMesh *m_CubeMesh;
     
-    std::vector<TextureCubemap*> m_cubemaps;
+    std::vector<std::shared_ptr<class BaseTexture>> m_cubemaps;
     size_t m_curIdx;
     
     //-------------------------------------------------
@@ -57,9 +56,6 @@ class SkyBox
     
     void addCubemap( const std::string &name );
     bool setCubemap( size_t idx );
-    
-    TextureCubemap* getCurrentCubemap() { return m_cubemaps[m_curIdx]; }//
-    TextureCubemap* getCubemap( size_t idx ) { return m_cubemaps[idx]; }//
     
     //-------------------------------------------------
     void toggleAutoRotate() {m_bAutoRotation = !m_bAutoRotation;}

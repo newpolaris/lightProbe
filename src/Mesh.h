@@ -49,7 +49,7 @@ class Mesh
     
   public:
     Mesh()
-      : m_bInitialized(false)
+      : m_bInitialized(false), m_model(1.f), m_normal(1.f)
     {}
     
     virtual ~Mesh() { destroy(); }

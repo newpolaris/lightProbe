@@ -34,6 +34,7 @@
 
 #include <GLType/ProgramShader.h>
 #include <GLType/Texture.h>
+#include <GLType/BaseTexture.h>
 #include <SkyBox.h>
 #include <Skydome.h>
 #include <Mesh.h>
@@ -53,6 +54,19 @@ struct LightProbe
 
 		Count
 	};
+
+	void load(const std::string& name)
+	{
+		char filePath[512];
+		std::snprintf(filePath, _countof(filePath), "resource/%s_lod.dds", name.c_str());
+		m_Tex.create(filePath);
+
+		std::snprintf(filePath, _countof(filePath), "resource/%s_irr.dds", name.c_str());
+		m_TexIrr.create(filePath);
+	}
+
+	BaseTexture m_Tex;
+	BaseTexture m_TexIrr;
 };
 
 struct Settings
@@ -127,6 +141,8 @@ namespace
 	GLFWwindow* window = nullptr;  
 
     ProgramShader m_program;
+    ProgramShader m_programMesh;
+    ProgramShader m_programSky;
 	std::shared_ptr<Texture2D> m_texture;
     SphereMesh m_mesh( 48, 5.0f);
 	SkyBox m_skybox;
@@ -134,12 +150,14 @@ namespace
 	Settings m_settings;
 	ModelPtr m_bunny;
 
+	LightProbe m_lightProbes[LightProbe::Count];
 	LightProbe::Enum m_currentLightProbe;
 
     //?
 
     TCamera camera;
 
+    GLuint m_EmptyVAO = 0;
     bool bWireframe = false;
 
     //?
@@ -151,11 +169,6 @@ namespace
     void finalizeApp();
 	void mainLoopApp();
     void moveCamera( int key, bool isPressed );
-	void handleInput();
-    void handleKeyboard(float delta);
-	void prefilter(fRGB* im, int width, int height);
-	void printcoeffs();
-	void tomatrix();
     void render();
 	void renderHUD();
 	void update();
@@ -256,6 +269,18 @@ namespace {
 		return buf;
 	}
 
+    glm::mat4 envViewMtx()
+    {
+        glm::vec3 toTargetNorm = camera.getDirection();
+        glm::vec3 fakeUp { 0, 1, 0 };
+        glm::vec3 right = glm::cross(fakeUp, toTargetNorm);
+        glm::vec3 up = glm::cross(toTargetNorm, right);
+        return glm::mat4( 
+            glm::vec4(right, 0), 
+            glm::vec4(up, 0),
+            glm::vec4(toTargetNorm, 0),
+            glm::vec4(0, 0, 0, 1));
+    }
 
 	void initApp(int argc, char** argv)
 	{
@@ -314,8 +339,22 @@ namespace {
 		m_skybox.setCubemap( 0u );
 
 		m_bunny = std::make_shared<ModelAssImp>();
-        m_bunny->create();
+		m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
+
+		m_lightProbes[LightProbe::Bolonga].load("bolonga");
+		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
+        m_currentLightProbe = LightProbe::Bolonga;
+
+        m_programMesh.initalize();
+        m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
+        m_programMesh.addShader(GL_FRAGMENT_SHADER, "IblMesh.Fragment");
+        m_programMesh.link();  
+
+        m_programSky.initalize();
+        m_programSky.addShader(GL_VERTEX_SHADER, "IblSkyBox.Vertex");
+        m_programSky.addShader(GL_FRAGMENT_SHADER, "IblSkyBox.Fragment");
+        m_programSky.link();  
 	}
 
 	void initExtension()
@@ -369,6 +408,8 @@ namespace {
         glFrontFace(GL_CCW);
 
         glDisable( GL_MULTISAMPLE );
+
+        glGenVertexArrays(1, &m_EmptyVAO);
 	}
 
 	void initWindow(int argc, char** argv)
@@ -380,9 +421,9 @@ namespace {
 			exit( EXIT_FAILURE );
 		}
 		glfwWindowHint(GLFW_SAMPLES, 4);
-		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
+		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
@@ -409,6 +450,8 @@ namespace {
 		m_bunny->destroy();
         glswShutdown();  
         m_program.destroy();
+        m_programMesh.destroy();
+        m_programSky.destroy();
         m_mesh.destroy();
         m_texture->destroy();
 		m_skydome.shutdown();
@@ -634,41 +677,27 @@ namespace {
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
-		// m_skybox.render( camera );
-		// m_skydome.render( camera );
-
         // Use our shader
-        m_program.bind();
+        m_lightProbes->m_Tex.bind(0);
+        m_lightProbes->m_TexIrr.bind(1);
 
-        glm::mat4 modelMatrix = m_mesh.getModelMatrix();
-        glm::mat4 mvp = camera.getViewProjMatrix() * modelMatrix;
-        m_program.setUniform( "uModelViewProjMatrix", mvp );
+        m_programSky.bind();
+        m_programSky.setUniform( "uViewRect", glm::vec4(0, 0, display_w, display_h));
+        m_programSky.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
+        m_programSky.setUniform( "uEnvViewMatrix", envViewMtx() );
+        // screen quad
+        glBindVertexArray(m_EmptyVAO);
+        // glDrawArrays(GL_TRIANGLES, 0, 3);
+        m_programSky.unbind();
 
-		// Vertex uniforms
-		m_program.setUniform( "uModelMatrix", modelMatrix);
-		m_program.setUniform( "uNormalMatrix", m_mesh.getNormalMatrix());
-		m_program.setUniform( "uEyePosWS", camera.getPosition());
-		m_program.setUniform( "uInvSkyboxRotation", m_skybox.getInvRotateMatrix() );
-		TextureCubemap *cubemap = m_skybox.getCurrentCubemap();
-
-		if (cubemap->hasSphericalHarmonics())
-		{
-			glm::mat4* matrix = cubemap->getSHMatrices();
-			m_program.setUniform( "uIrradianceMatrix[0]", matrix[0]);
-			m_program.setUniform( "uIrradianceMatrix[1]", matrix[1]);
-			m_program.setUniform( "uIrradianceMatrix[2]", matrix[2]);
-		}
-
-        cubemap->bind(0u);
-        // m_mesh.draw();
-
-        mvp = camera.getViewProjMatrix() * modelMatrix;
-		m_program.setUniform( "uModelMatrix", modelMatrix);
-        m_program.setUniform( "uModelViewProjMatrix", mvp );
+        m_programMesh.bind();
+        m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
+		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
 		m_bunny->render();
+        m_programMesh.unbind();
 
-        cubemap->unbind(0u);
-        m_program.unbind();
+        m_lightProbes->m_Tex.unbind(0);
+        m_lightProbes->m_TexIrr.unbind(1);
 
 		renderHUD();
     }

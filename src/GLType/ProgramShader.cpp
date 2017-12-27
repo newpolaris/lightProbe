@@ -165,7 +165,7 @@ bool ProgramShader::setUniform( const std::string &name, const glm::mat3 &v) con
     
   if (-1 == loc)
   {
-    //Logger::getInstance().debug( "ProgramShader : can't find uniform \"%s\".", name);
+    // printf("ProgramShader : can't find uniform \"%s\".", name.c_str());
     return false;
   }    
 
@@ -179,7 +179,7 @@ bool ProgramShader::setUniform( const std::string &name, const glm::mat4 &v) con
     
   if (-1 == loc) 
   {
-    //Logger::getInstance().debug( "ProgramShader : can't find uniform \"%s\".", name);
+    // printf("ProgramShader : can't find uniform \"%s\".", name.c_str());
     return false;
   }    
   

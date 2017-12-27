@@ -1,6 +1,7 @@
 
 #include "TCamera.hpp"
 
+#define GLM_ENABLE_EXPERIMENTAL 1
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_access.hpp>
@@ -12,7 +13,7 @@
 #include <stdio.h>
 #include "Mesh.h"
 
-TCamera::TCamera()
+TCamera::TCamera() : m_projectionMatrix(1.), m_viewMatrix(1.f), m_viewProjMatrix(1.f)
 {
   // Default projection parameters
   m_fov   = 45.0f;

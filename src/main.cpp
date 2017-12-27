@@ -171,82 +171,74 @@ namespace
 
 // Breakpoints that should ALWAYS trigger (EVEN IN RELEASE BUILDS) [x86]!
 #ifdef _MSC_VER
-# define eTB_CriticalBreakPoint() if (IsDebuggerPresent ()) __debugbreak ();
-#else
-# define eTB_CriticalBreakPoint() asm (" int $3");
+#define DEBUG_BREAK __debugbreak()
+#else 
+#include <signal.h>
+// raise(SIGTRAP);
+// __builtin_trap() 
 #endif
+
+void APIENTRY OpenglCallbackFunction(GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message,
+    const void* userParam)
+{
+    using namespace std;
+
+    // ignore these non-significant error codes
+    if (id == 131169 || id == 131185 || id == 131218 || id == 131204) 
+        return;
+
+    cout << "---------------------opengl-callback-start------------" << endl;
+    cout << "message: " << message << endl;
+    cout << "type: ";
+    switch(type) {
+    case GL_DEBUG_TYPE_ERROR:
+        cout << "ERROR";
+        break;
+    case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+        cout << "DEPRECATED_BEHAVIOR";
+        break;
+    case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+        cout << "UNDEFINED_BEHAVIOR";
+        break;
+    case GL_DEBUG_TYPE_PORTABILITY:
+        cout << "PORTABILITY";
+        break;
+    case GL_DEBUG_TYPE_PERFORMANCE:
+        cout << "PERFORMANCE";
+        break;
+    case GL_DEBUG_TYPE_OTHER:
+        cout << "OTHER";
+        break;
+    }
+    cout << endl;
+
+    cout << "id: " << id << endl;
+    cout << "severity: ";
+    switch(severity){
+    case GL_DEBUG_SEVERITY_LOW:
+        cout << "LOW";
+        break;
+    case GL_DEBUG_SEVERITY_MEDIUM:
+        cout << "MEDIUM";
+        break;
+    case GL_DEBUG_SEVERITY_HIGH:
+        cout << "HIGH";
+        break;
+    }
+    cout << endl;
+    cout << "---------------------opengl-callback-end--------------" << endl;
+    if (type == GL_DEBUG_TYPE_ERROR)
+        DEBUG_BREAK;
+}
 
 namespace {
 	using namespace std;
 
-	typedef unsigned long DWORD;
-	const char* ETB_GL_DEBUG_SOURCE_STR (GLenum source)
-	{
-		static const char* sources [] = {
-			"API",   "Window System", "Shader Compiler", "Third Party", "Application",
-			"Other", "Unknown"
-		};
-
-		int str_idx = min ( size_t(source - GL_DEBUG_SOURCE_API), sizeof (sources) / sizeof (const char *) );
-
-		return sources [str_idx];
-	}
-
-	const char* ETB_GL_DEBUG_TYPE_STR (GLenum type)
-	{
-		static const char* types [] = {
-			"Error",       "Deprecated Behavior", "Undefined Behavior", "Portability",
-			"Performance", "Other",               "Unknown"
-		};
-
-		int str_idx = min ( (size_t)(type - GL_DEBUG_TYPE_ERROR), sizeof (types) / sizeof (const char *) );
-
-		return types [str_idx];
-	}
-
-	const char* ETB_GL_DEBUG_SEVERITY_STR (GLenum severity)
-	{
-		static const char* severities [] = {
-			"High", "Medium", "Low", "Unknown"
-		};
-		int str_idx = min ( (size_t)(severity - GL_DEBUG_SEVERITY_HIGH), sizeof(severities)/sizeof(const char *));
-		return severities [str_idx];
-	}
-
-	void ETB_GL_ERROR_CALLBACK (
-			GLenum        source,
-			GLenum        type,
-			GLuint        id,
-			GLenum        severity,
-			GLsizei       length,
-			const GLchar* message,
-			GLvoid*       userParam)
-	{
-		printf("OpenGL Error:\n");
-		printf("=============\n");
-		printf(" Object ID: ");
-		printf("%d\n", id);
-		printf(" Severity:  ");
-		printf("%s\n", ETB_GL_DEBUG_SEVERITY_STR(severity));
-
-		printf(" Type:      ");
-		printf("%s\n", ETB_GL_DEBUG_TYPE_STR     (type));
-
-		printf(" Source:    ");
-		printf("%s\n", ETB_GL_DEBUG_SOURCE_STR   (source));
-
-		printf(" Message:   ");
-		printf("%s\n\n", message);
-
-		// Force the console to flush its contents before executing a breakpoint
-		fflush(stdout);
-
-		// Trigger a breakpoint in gDEBugger...
-		glFinish ();
-
-		// Trigger a breakpoint in traditional debuggers...
-		eTB_CriticalBreakPoint ();
-	}
 
 	typedef std::vector<std::istream::char_type> ByteArray;
 	ByteArray ReadFileSync( const std::string& name )
@@ -352,22 +344,17 @@ namespace {
 			glGetString(GL_VERSION)    // e.g. 3.2 INTEL-8.0.61
         );
 
-		// SUPER VERBOSE DEBUGGING!
-    #if 0
-		if (glDebugMessageControlARB != NULL) {
-			glEnable                  (GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
-			glDebugMessageControlARB  (GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
-			glDebugMessageCallbackARB ((GLDEBUGPROCARB)ETB_GL_ERROR_CALLBACK, NULL);
-		}
+    #if _DEBUG
+        glEnable(GL_DEBUG_OUTPUT);
+        if (glDebugMessageCallback) {
+            cout << "Register OpenGL debug callback " << endl;
+            glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
+            glDebugMessageCallback(OpenglCallbackFunction, nullptr);
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        }
+        else
+            cout << "glDebugMessageCallback not available" << endl;
     #endif
-		GLint flags; 
-		glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
-		if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
-		{
-			glEnable(GL_DEBUG_OUTPUT);
-			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
-		}
 
         glClearColor( 0.15f, 0.15f, 0.15f, 0.0f);
 
@@ -646,7 +633,7 @@ namespace {
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
-		m_skybox.render( camera );
+		// m_skybox.render( camera );
 		// m_skydome.render( camera );
 
         // Use our shader

@@ -30,7 +30,9 @@ class VertexBuffer
   protected:
     GLuint m_vao;
     GLuint m_vbo;    
-
+    GLuint m_ibo;
+    std::vector<GLuint> m_index;
+    
     std::vector<glm::vec3> m_position;
     std::vector<glm::vec3> m_normal;
     std::vector<glm::vec2> m_texcoord;
@@ -44,7 +46,7 @@ class VertexBuffer
 
   public:
     VertexBuffer() 
-      : m_vao(0u), m_vbo(0u),
+      : m_vao(0u), m_vbo(0u), m_ibo(0u),
         m_positionSize(0), m_normalSize(0), m_texcoordSize(0),
         m_offset(0)
     {}
@@ -71,10 +73,12 @@ class VertexBuffer
     
     
     GLuint getVBO() const {return m_vbo;}
+    GLuint getIBO() const {return m_ibo;}
     
     std::vector<glm::vec3>& getPosition() {return m_position;}
     std::vector<glm::vec3>& getNormal() {return m_normal;}
     std::vector<glm::vec2>& getTexcoord() {return m_texcoord;}
+    std::vector<unsigned int>& getIndex() {return m_index;}
     
     GLintptr getOffset() const { return m_offset; }
 };

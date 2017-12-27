@@ -33,11 +33,8 @@ void BaseMesh::render()
 	{
 	}
 	m_VertexBuffer.enable();  
-	m_IndexBuffer.enable();  
-	const unsigned int numIndices = m_IndexBuffer.m_NumIndices;
-	GL_ASSERT(glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, 0));
+	GL_ASSERT(glDrawElements(GL_TRIANGLES, m_NumIndices, GL_UNSIGNED_INT, 0));
 	m_VertexBuffer.disable();
-	m_IndexBuffer.disable();  
 
 	CHECKGLERROR();
 }
@@ -84,6 +81,7 @@ bool ModelAssImp::loadFromFile(const std::string& filename)
 		std::vector<glm::vec3>& positions = vb.getPosition();
 		std::vector<glm::vec3>& normals = vb.getNormal();
 		std::vector<glm::vec2>& texcoords = vb.getTexcoord();
+		std::vector<unsigned int>& indices = vb.getIndex();
 
 		const int NumVertices = paiMesh->mNumVertices;
 		positions.resize(NumVertices);
@@ -103,6 +101,18 @@ bool ModelAssImp::loadFromFile(const std::string& filename)
 			texcoords[i] = glm::vec2(tex.x, tex.y);
 		}
 
+		// index buffer 
+		const int NumFaces = paiMesh->mNumFaces;
+        indices.clear();
+		indices.reserve(NumFaces * 3);
+		for (unsigned int i = 0; i < NumFaces; i++) {
+			const aiFace& face = paiMesh->mFaces[i];
+			indices.push_back(face.mIndices[0]); 
+			indices.push_back(face.mIndices[1]); 
+			indices.push_back(face.mIndices[2]); 
+		}
+        mesh->m_NumIndices = indices.size();
+
 		// Generate buffer's id
 		vb.initialize();  
 
@@ -111,18 +121,6 @@ bool ModelAssImp::loadFromFile(const std::string& filename)
 
 		// Remove data from the CPU [optional]
 		vb.cleanData();
-
-		// index buffer 
-		const int NumFaces = paiMesh->mNumFaces;
-		std::vector<unsigned int> indices;
-		indices.reserve(NumFaces * 3);
-		for (unsigned int i = 0; i < NumFaces; i++) {
-			const aiFace& face = paiMesh->mFaces[i];
-			indices.push_back(face.mIndices[0]); 
-			indices.push_back(face.mIndices[1]); 
-			indices.push_back(face.mIndices[2]); 
-		}
-		mesh->m_IndexBuffer.create(indices);	
 
 		m_Meshes.push_back(mesh);
 	}

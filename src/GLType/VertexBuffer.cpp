@@ -17,16 +17,19 @@ void VertexBuffer::initialize()
 {
   if (!m_vao) glGenVertexArrays( 1, &m_vao);
   if (!m_vbo) glGenBuffers( 1, &m_vbo);
+  if (!m_ibo) glGenBuffers( 1, &m_ibo);
 }
 
 void VertexBuffer::destroy()
 {
   if (m_vao) glDeleteVertexArrays( 1, &m_vao);
   if (m_vbo) glDeleteBuffers( 1, &m_vbo);
+  if (m_ibo) glDeleteBuffers( 1, &m_ibo);
   
   cleanData();
   m_vao = 0;
   m_vbo = 0;
+  m_ibo = 0;
 }
 
 void VertexBuffer::cleanData()
@@ -34,12 +37,12 @@ void VertexBuffer::cleanData()
   m_position.clear();
   m_normal.clear();
   m_texcoord.clear();
+  m_index.clear();
 }
 
 void VertexBuffer::complete(GLenum usage)
 {
   assert( m_vao && m_vbo );
-  
   
   m_positionSize = m_normalSize = m_texcoordSize = 0;  
   if (!m_position.empty()) m_positionSize = m_position.size() * sizeof(glm::vec3);
@@ -50,7 +53,12 @@ void VertexBuffer::complete(GLenum usage)
     
   
   bind();
+  glBindBuffer( GL_ARRAY_BUFFER, m_vbo);
   {    
+    if(m_positionSize != 0)  glEnableVertexAttribArray(VATTRIB_POSITION);
+    if(m_normalSize != 0)    glEnableVertexAttribArray(VATTRIB_NORMAL);
+    if(m_texcoordSize != 0)  glEnableVertexAttribArray(VATTRIB_TEXCOORD);
+
     glBufferData( GL_ARRAY_BUFFER, bufferSize, 0, usage);
       
     m_offset = 0;
@@ -75,6 +83,12 @@ void VertexBuffer::complete(GLenum usage)
       glVertexAttribPointer( VATTRIB_TEXCOORD, 2, GL_FLOAT, GL_FALSE, 0, (void*)(m_offset));  
       m_offset += m_texcoordSize;
     }
+
+    if (!m_index.empty())
+    {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*m_index.size(), m_index.data(), GL_STATIC_DRAW);
+    }
   }
   unbind();
 }
@@ -83,29 +97,19 @@ void VertexBuffer::complete(GLenum usage)
 void VertexBuffer::bind() const
 {
   glBindVertexArray( m_vao );
-  glBindBuffer( GL_ARRAY_BUFFER, m_vbo);
 }
 
 void VertexBuffer::unbind()
 {
-  glBindBuffer( GL_ARRAY_BUFFER, 0u);
   glBindVertexArray( 0u );
 }
 
 void VertexBuffer::enable() const
 {  
   bind();
-  
-  if (m_positionSize != 0)  glEnableVertexAttribArray( VATTRIB_POSITION );
-  if (m_normalSize != 0)    glEnableVertexAttribArray( VATTRIB_NORMAL );
-  if (m_texcoordSize != 0)  glEnableVertexAttribArray( VATTRIB_TEXCOORD );
 }
 
 void VertexBuffer::disable()
 {    
- 	glDisableVertexAttribArray( VATTRIB_POSITION );
-  glDisableVertexAttribArray( VATTRIB_NORMAL );
-  glDisableVertexAttribArray( VATTRIB_TEXCOORD );
-  
   unbind();
 }

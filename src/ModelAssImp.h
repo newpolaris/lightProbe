@@ -41,6 +41,7 @@ public:
 	void destroy();
 	void render();
 
+    uint32_t m_NumIndices = 0;
 	int32_t m_MaterialIndex = -1;
     VertexBuffer m_VertexBuffer;
 	IndexBuffer m_IndexBuffer;

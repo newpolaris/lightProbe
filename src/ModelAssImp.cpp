@@ -12,28 +12,8 @@
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing fla
 
-void BaseMaterial::destroy()
-{
-}
-
-void BaseMesh::initialize()
-{
-}
-
-void BaseMesh::destroy()
-{
-	m_Material = nullptr;
-}
-
-void BaseMesh::render()
-{
-	if (m_Material)
-	{
-	}
-	GL_ASSERT(glDrawElements(GL_TRIANGLES, m_NumIndices, GL_UNSIGNED_INT, 0));
-
-	CHECKGLERROR();
-}
+#include "BaseMaterial.h"
+#include "BaseMesh.h"
 
 void ModelAssImp::destroy()
 {

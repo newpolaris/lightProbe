@@ -1,50 +1,7 @@
 #include <memory>
 #include <vector>
 #include <GL/glew.h>
-
-typedef std::shared_ptr<class BaseMaterial> BaseMaterialPtr;
-typedef std::shared_ptr<class BaseMesh> BaseMeshPtr;
-typedef std::shared_ptr<class ModelAssImp> ModelPtr;
-typedef std::vector<BaseMaterialPtr> BaseMaterialList;
-typedef std::vector<BaseMeshPtr> BaseMeshList;
-
-class BaseMaterial
-{
-public:
-	BaseMaterial()
-	{
-	}
-
-	virtual ~BaseMaterial()
-	{
-		destroy();
-	}
-
-	void initialize();
-	void destroy();
-};
-
-
-class BaseMesh
-{
-public:
-	BaseMesh()
-	{
-	}
-
-	virtual ~BaseMesh()
-	{
-		destroy();
-	}
-
-	void initialize();
-	void destroy();
-	void render();
-
-    uint32_t m_NumIndices = 0;
-	int32_t m_MaterialIndex = -1;
-	BaseMaterialPtr m_Material;
-};
+#include "Types.h"
 
 class ModelAssImp
 {

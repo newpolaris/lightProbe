@@ -367,7 +367,6 @@ namespace {
 			glEnable(GL_DEBUG_OUTPUT);
 			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
-			glDebugMessageCallback((GLDEBUGPROCARB)ETB_GL_ERROR_CALLBACK, NULL);
 		}
 
         glClearColor( 0.15f, 0.15f, 0.15f, 0.0f);
@@ -673,7 +672,7 @@ namespace {
 		}
 
         cubemap->bind(0u);
-        m_mesh.draw();
+        // m_mesh.draw();
 
         mvp = camera.getViewProjMatrix() * modelMatrix;
 		m_program.setUniform( "uModelMatrix", modelMatrix);

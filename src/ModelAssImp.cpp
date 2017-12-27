@@ -127,8 +127,9 @@ bool ModelAssImp::loadFromFile(const std::string& filename)
 		// index buffer 
 		for (unsigned int i = 0; i < paiMesh->mNumFaces; i++) {
 			const aiFace& face = paiMesh->mFaces[i];
+            const unsigned int base = i*3;
 			for (unsigned int j = 0; j < 3; j++)
-				indices[baseIdx + i*3 + j] = face.mIndices[j];
+				indices[baseIdx + base + j] = face.mIndices[j];
 		}
 
 		mesh->m_VertexBase = baseVert;

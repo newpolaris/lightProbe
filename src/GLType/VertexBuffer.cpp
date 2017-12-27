@@ -16,19 +16,17 @@
 void VertexBuffer::initialize()
 {
   if (!m_vao) glGenVertexArrays( 1, &m_vao);
-  glGenBuffers( 3, m_vbo);
-  if (!m_ibo) glGenBuffers( 1, &m_ibo);
+  if (!m_vbo) glGenBuffers( 1, &m_vbo);
 }
 
 void VertexBuffer::destroy()
 {
   if (m_vao) glDeleteVertexArrays( 1, &m_vao);
-  glDeleteBuffers( 3, m_vbo);
-  if (m_ibo) glDeleteBuffers( 1, &m_ibo);
+  if (m_vbo) glDeleteBuffers( 1, &m_vbo);
   
   cleanData();
   m_vao = 0;
-  m_ibo = 0;
+  m_vbo = 0;
 }
 
 void VertexBuffer::cleanData()
@@ -36,12 +34,12 @@ void VertexBuffer::cleanData()
   m_position.clear();
   m_normal.clear();
   m_texcoord.clear();
-  m_index.clear();
 }
 
 void VertexBuffer::complete(GLenum usage)
 {
   assert( m_vao && m_vbo );
+  
   
   m_positionSize = m_normalSize = m_texcoordSize = 0;  
   if (!m_position.empty()) m_positionSize = m_position.size() * sizeof(glm::vec3);
@@ -53,37 +51,29 @@ void VertexBuffer::complete(GLenum usage)
   
   bind();
   {    
+    glBufferData( GL_ARRAY_BUFFER, bufferSize, 0, usage);
+      
     m_offset = 0;
     
     if (!m_position.empty())
     {
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo[0]);
-        glBufferData(GL_ARRAY_BUFFER, m_positionSize, m_position.data(), GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+      glBufferSubData( GL_ARRAY_BUFFER, m_offset, m_positionSize, &m_position[0]);
+      glVertexAttribPointer( VATTRIB_POSITION, 3, GL_FLOAT, GL_FALSE, 0, (void*)(m_offset));
+      m_offset += m_positionSize;
     }
     
     if (!m_normal.empty())
     {
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo[1]);
-        glBufferData(GL_ARRAY_BUFFER, m_normalSize, m_normal.data(), GL_STATIC_DRAW);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
+      glBufferSubData( GL_ARRAY_BUFFER, m_offset, m_normalSize, &m_normal[0]);
+      glVertexAttribPointer( VATTRIB_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, (void*)(m_offset));
+      m_offset += m_normalSize;
     }
     
     if (!m_texcoord.empty())
     {
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo[2]);
-        glBufferData(GL_ARRAY_BUFFER, m_texcoordSize, m_texcoord.data(), GL_STATIC_DRAW);
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    }
-
-    if (!m_index.empty())
-    {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*m_index.size(), m_index.data(), GL_STATIC_DRAW);
+      glBufferSubData( GL_ARRAY_BUFFER, m_offset, m_texcoordSize, &m_texcoord[0]);
+      glVertexAttribPointer( VATTRIB_TEXCOORD, 2, GL_FLOAT, GL_FALSE, 0, (void*)(m_offset));  
+      m_offset += m_texcoordSize;
     }
   }
   unbind();
@@ -93,19 +83,29 @@ void VertexBuffer::complete(GLenum usage)
 void VertexBuffer::bind() const
 {
   glBindVertexArray( m_vao );
+  glBindBuffer( GL_ARRAY_BUFFER, m_vbo);
 }
 
 void VertexBuffer::unbind()
 {
+  glBindBuffer( GL_ARRAY_BUFFER, 0u);
   glBindVertexArray( 0u );
 }
 
 void VertexBuffer::enable() const
 {  
   bind();
+  
+  if (m_positionSize != 0)  glEnableVertexAttribArray( VATTRIB_POSITION );
+  if (m_normalSize != 0)    glEnableVertexAttribArray( VATTRIB_NORMAL );
+  if (m_texcoordSize != 0)  glEnableVertexAttribArray( VATTRIB_TEXCOORD );
 }
 
 void VertexBuffer::disable()
 {    
+ 	glDisableVertexAttribArray( VATTRIB_POSITION );
+  glDisableVertexAttribArray( VATTRIB_NORMAL );
+  glDisableVertexAttribArray( VATTRIB_TEXCOORD );
+  
   unbind();
 }

@@ -687,7 +687,7 @@ namespace {
         m_programSky.setUniform( "uEnvViewMatrix", envViewMtx() );
         // screen quad
         glBindVertexArray(m_EmptyVAO);
-        // glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
         m_programSky.unbind();
 
         m_programMesh.bind();

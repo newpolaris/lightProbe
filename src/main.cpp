@@ -74,23 +74,15 @@ struct Settings
 	{
 		m_envRotCurr = 0.0f;
 		m_envRotDest = 0.0f;
-		m_lightDir[0] = -0.8f;
-		m_lightDir[1] = 0.2f;
-		m_lightDir[2] = -0.5f;
-		m_lightCol[0] = 1.0f;
-		m_lightCol[1] = 1.0f;
-		m_lightCol[2] = 1.0f;
+		m_lightDir = glm::vec3(-0.8f, 0.2f, -0.5f);
+		m_lightCol = glm::vec3(1.f);
 		m_glossiness = 0.7f;
 		m_exposure = 0.0f;
 		m_bgType = 3.0f;
 		m_radianceSlider = 2.0f;
 		m_reflectivity = 0.85f;
-		m_rgbDiff[0] = 1.0f;
-		m_rgbDiff[1] = 1.0f;
-		m_rgbDiff[2] = 1.0f;
-		m_rgbSpec[0] = 1.0f;
-		m_rgbSpec[1] = 1.0f;
-		m_rgbSpec[2] = 1.0f;
+		m_rgbDiff = glm::vec3(1.f);
+		m_rgbSpec = glm::vec3(1.f);
 		m_lod = 0.0f;
 		m_doDiffuse = false;
 		m_doSpecular = false;
@@ -105,15 +97,15 @@ struct Settings
 
 	float m_envRotCurr;
 	float m_envRotDest;
-	float m_lightDir[3];
-	float m_lightCol[3];
+	glm::vec3 m_lightDir;
+	glm::vec3 m_lightCol;
 	float m_glossiness;
 	float m_exposure;
 	float m_radianceSlider;
 	float m_bgType;
 	float m_reflectivity;
-	float m_rgbDiff[3];
-	float m_rgbSpec[3];
+	glm::vec3 m_rgbDiff;
+	glm::vec3 m_rgbSpec;
 	float m_lod;
 	bool  m_doDiffuse;
 	bool  m_doSpecular;
@@ -331,7 +323,7 @@ namespace {
 		m_texture = std::make_shared<BaseTexture>();
 
 		m_skybox.initialize();
-		m_skybox.addCubemap( "resource/Cube/cubemap.dds" );
+		m_skybox.addCubemap( "resource/bolonga_lod.dds" );
 		m_skybox.setCubemap( 0u );
 
 		m_bunny = std::make_shared<ModelAssImp>();
@@ -545,7 +537,7 @@ namespace {
 			ImGui::SliderFloat("Light direction X", &m_settings.m_lightDir[0], -1.0f, 1.0f);
 			ImGui::SliderFloat("Light direction Y", &m_settings.m_lightDir[1], -1.0f, 1.0f);
 			ImGui::SliderFloat("Light direction Z", &m_settings.m_lightDir[2], -1.0f, 1.0f);
-			ImGui::ColorWheel("Color:", m_settings.m_lightCol, 0.6f);
+			ImGui::ColorWheel("Color:", glm::value_ptr(m_settings.m_lightCol), 0.6f);
 		}
 		ImGui::Unindent();
 
@@ -655,11 +647,11 @@ namespace {
 			ImGui::Unindent();
 		}
 
-		ImGui::ColorWheel("Diffuse:", &m_settings.m_rgbDiff[0], 0.7f);
+		ImGui::ColorWheel("Diffuse:", glm::value_ptr(m_settings.m_rgbDiff), 0.7f);
 		ImGui::Separator();
 		if ( (1 == m_settings.m_metalOrSpec) && isBunny )
 		{
-			ImGui::ColorWheel("Specular:", &m_settings.m_rgbSpec[0], 0.7f);
+			ImGui::ColorWheel("Specular:", glm::value_ptr(m_settings.m_rgbSpec), 0.7f);
 		}
 		ImGui::End();
 	}
@@ -674,6 +666,7 @@ namespace {
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
+		// m_programMesh.setUniform( "uBgType", m_settings.m_bgType );
 		m_skybox.render(camera);
 
         // Use our shader
@@ -683,6 +676,18 @@ namespace {
         m_programMesh.bind();
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
+		m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
+		m_programMesh.setUniform( "uReflectivity", m_settings.m_reflectivity );
+		m_programMesh.setUniform( "uExposure", m_settings.m_exposure );
+		m_programMesh.setUniform( "uMetalOrSpec", m_settings.m_metalOrSpec );
+		m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
+		m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
+		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
+		m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
+		m_programMesh.setUniform( "uRgbDiff",  m_settings.m_rgbDiff );
+		m_programMesh.setUniform( "uRgbSpec",  m_settings.m_rgbSpec );
+		m_programMesh.setUniform( "uLightDir",  m_settings.m_lightDir );
+		m_programMesh.setUniform( "uLightCol",  m_settings.m_lightCol );
 		m_bunny->render();
         m_programMesh.unbind();
 

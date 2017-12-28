@@ -662,8 +662,8 @@ namespace {
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
 		// Submit view 0.
-        m_lightProbes->m_Tex.bind(0);
-        m_lightProbes->m_TexIrr.bind(1);
+        m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
+        m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
 		glDisable( GL_DEPTH_TEST );
 		glDepthMask( GL_FALSE );  
 		glDisable( GL_CULL_FACE );  
@@ -687,8 +687,8 @@ namespace {
 		glEnable( GL_DEPTH_TEST ); 
 
 		// Sumbit view 1.
-        m_lightProbes->m_Tex.bind(0);
-        m_lightProbes->m_TexIrr.bind(1);
+        m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
+        m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
         m_programMesh.bind();
 		// Uniform binding
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
@@ -737,8 +737,8 @@ namespace {
 			}
 		}
         m_programMesh.unbind();
-        m_lightProbes->m_Tex.unbind(0);
-        m_lightProbes->m_TexIrr.unbind(0);
+        m_lightProbes[m_currentLightProbe].m_Tex.unbind(0);
+        m_lightProbes[m_currentLightProbe].m_TexIrr.unbind(0);
 
 		renderHUD();
     }

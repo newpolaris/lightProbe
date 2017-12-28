@@ -127,7 +127,7 @@ bool ProgramShader::setUniform( const std::string &name, GLfloat v) const
     return false;
   }
   
-  glUniform1i( loc, v);
+  glUniform1f( loc, v);
   return true;
 }
 

@@ -140,6 +140,7 @@ namespace
 	SkyBox m_skybox;
 	Settings m_settings;
 	ModelPtr m_bunny;
+	ModelPtr m_orb;
 
 	LightProbe m_lightProbes[LightProbe::Count];
 	LightProbe::Enum m_currentLightProbe;
@@ -330,6 +331,9 @@ namespace {
 		m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
 
+		m_orb = std::make_shared<ModelAssImp>();
+		m_orb->create();
+
 		m_lightProbes[LightProbe::Bolonga].load("bolonga");
 		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
         m_currentLightProbe = LightProbe::Bolonga;
@@ -436,6 +440,7 @@ namespace {
 	void finalizeApp()
 	{
 		m_bunny->destroy();
+		m_orb->destroy();
         glswShutdown();  
         m_program.destroy();
         m_programMesh.destroy();
@@ -672,27 +677,54 @@ namespace {
         // Use our shader
         m_lightProbes->m_Tex.bind(0);
         m_lightProbes->m_TexIrr.bind(1);
-
         m_programMesh.bind();
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
 		m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
 		m_programMesh.setUniform( "uReflectivity", m_settings.m_reflectivity );
 		m_programMesh.setUniform( "uExposure", m_settings.m_exposure );
-		m_programMesh.setUniform( "uMetalOrSpec", m_settings.m_metalOrSpec );
 		m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
 		m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
 		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
 		m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
-		m_programMesh.setUniform( "uRgbDiff",  m_settings.m_rgbDiff );
-		m_programMesh.setUniform( "uRgbSpec",  m_settings.m_rgbSpec );
-		m_programMesh.setUniform( "uLightDir",  m_settings.m_lightDir );
-		m_programMesh.setUniform( "uLightCol",  m_settings.m_lightCol );
-		m_bunny->render();
+		m_programMesh.setUniform( "ubMetalOrSpec", float(m_settings.m_metalOrSpec) );
+		m_programMesh.setUniform( "uRgbDiff", m_settings.m_rgbDiff );
+		m_programMesh.setUniform( "uRgbSpec", m_settings.m_rgbSpec );
+		m_programMesh.setUniform( "uLightDir", m_settings.m_lightDir );
+		m_programMesh.setUniform( "uLightCol", m_settings.m_lightCol );
+		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );
+
+		// Texture binding
+		m_programMesh.setUniform( "uEnvmap", 0 );
+		m_programMesh.setUniform( "uEnvmapIrr", 1 );
+
+				m_sphere.draw();
+#if 0
+		// Submit orbs.
+		for (float yy = 0, yend = 5.0f; yy < yend; yy+=1.0f)
+		{
+			for (float xx = 0, xend = 5.0f; xx < xend; xx+=1.0f)
+			{
+				const float scale   =  1.2f;
+				const float spacing =  2.2f*30;
+				const float yAdj    = -0.8f;
+				glm::vec3 translate(
+						0.0f + (xx/xend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/xend),
+						yAdj/yend + (yy/yend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/yend),
+						0.0f);
+				glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale/xend));
+				glm::mat4 mtxST = glm::translate(mtxS, translate);
+				m_programMesh.setUniform( "uGlossiness", xx*(1.0f/xend) );
+				m_programMesh.setUniform( "uReflectivity", (yend-yy)*(1.0f/yend) );
+				m_programMesh.setUniform( "uMtxSrt", mtxST );
+				m_sphere.draw();
+			}
+		}
+#endif
         m_programMesh.unbind();
 
         m_lightProbes->m_Tex.unbind(0);
-        m_lightProbes->m_TexIrr.unbind(1);
+        m_lightProbes->m_TexIrr.unbind(0);
 
 		renderHUD();
     }

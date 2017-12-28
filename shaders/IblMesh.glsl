@@ -9,6 +9,7 @@ out vec3 vNormalWS;
 out vec3 vViewDirWS;
 
 // UNIFORM
+uniform mat4 uMtxSrt;
 uniform mat4 uModelViewProjMatrix;
 uniform vec3 uEyePosWS;
 
@@ -18,10 +19,11 @@ void main()
   gl_Position = uModelViewProjMatrix * inPosition;
 
   // World Space normal
-  vNormalWS = normalize( inNormal );
+  vec3 normal = mat3(uMtxSrt) * inNormal;
+  vNormalWS = normalize(normal);
   
   // World Space view direction from world space position
-  vec3 posWS = vec3(inPosition);
+  vec3 posWS = vec3((uMtxSrt * inPosition).xyz);
   vViewDirWS = normalize(uEyePosWS - posWS);
 }
 
@@ -44,7 +46,7 @@ layout(location = 0) out vec4 fragColor;
 uniform samplerCube uEnvmap;
 uniform samplerCube uEnvmapIrr;
 
-uniform bool ubMetalOrSpec;
+uniform float ubMetalOrSpec;
 uniform float ubDiffuse;
 uniform float ubSpecular;
 uniform float ubDiffuseIbl;
@@ -204,7 +206,7 @@ void main()
 
   // Reflection.
   vec3 refl;
-  if (false == ubMetalOrSpec) // Metalness workflow.
+  if (0.0 == ubMetalOrSpec) // Metalness workflow.
   {
       refl = mix(vec3(0.04), inAlbedo, inReflectivity);
   }
@@ -212,6 +214,7 @@ void main()
   {
       refl = uRgbSpec * vec3(inReflectivity);
   }
+
   vec3 albedo = inAlbedo * (1.0 - inReflectivity);
   vec3 dirFresnel = calcFresnel(refl, hdotv, inGloss);
   vec3 envFresnel = calcFresnel(refl, ndotv, inGloss);

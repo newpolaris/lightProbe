@@ -92,7 +92,7 @@ struct Settings
 		m_showDiffColorWheel = true;
 		m_showSpecColorWheel = true;
 		m_metalOrSpec = 0;
-		m_sphereSelection = 0;
+		m_meshSelection = 0;
 	}
 
 	float m_envRotCurr;
@@ -115,7 +115,7 @@ struct Settings
 	bool  m_showDiffColorWheel;
 	bool  m_showSpecColorWheel;
 	int32_t m_metalOrSpec;
-	int32_t m_sphereSelection;
+	int32_t m_meshSelection;
 };
 
 
@@ -137,7 +137,6 @@ namespace
     SphereMesh m_sphere( 48, 5.0f );
     FullscreenTriangleMesh m_triangle;
     CubeMesh m_cube;
-	SkyBox m_skybox;
 	Settings m_settings;
 	ModelPtr m_bunny;
 	ModelPtr m_orb;
@@ -319,10 +318,6 @@ namespace {
 
 		m_texture = std::make_shared<BaseTexture>();
 
-		m_skybox.initialize();
-		m_skybox.addCubemap( "resource/bolonga_lod.dds" );
-		m_skybox.setCubemap( 0u );
-
 		m_bunny = std::make_shared<ModelAssImp>();
 		m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
@@ -444,7 +439,6 @@ namespace {
 		m_cube.destroy();
 		m_triangle.destroy();
         m_texture->destroy();
-		m_skybox.shutdown();
         Logger::getInstance().close();
 		ImGui_ImplGlfwGL3_Shutdown();
 		glfwTerminate();
@@ -620,11 +614,11 @@ namespace {
 
 		ImGui::Text("Mesh:");
 		ImGui::Indent();
-		ImGui::RadioButton("Bunny", &m_settings.m_sphereSelection, 0);
-		ImGui::RadioButton("Orbs",  &m_settings.m_sphereSelection, 1);
+		ImGui::RadioButton("Bunny", &m_settings.m_meshSelection, 0);
+		ImGui::RadioButton("Orbs",  &m_settings.m_meshSelection, 1);
 		ImGui::Unindent();
 
-		const bool isBunny = (0 == m_settings.m_sphereSelection);
+		const bool isBunny = (0 == m_settings.m_meshSelection);
 		if (!isBunny)
 		{
 			m_settings.m_metalOrSpec = 0;
@@ -668,17 +662,23 @@ namespace {
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
 		// Submit view 0.
+        m_lightProbes->m_Tex.bind(0);
+        m_lightProbes->m_TexIrr.bind(1);
 		glDisable( GL_DEPTH_TEST );
 		glDepthMask( GL_FALSE );  
 		glDisable( GL_CULL_FACE );  
 		glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );  
-        m_lightProbes->m_Tex.bind(0);
-        m_lightProbes->m_TexIrr.bind(1);
+		glm::mat4 followCamera = glm::translate( glm::mat4(1.0f), camera.getPosition());
+		glm::mat4 skyboxMtx = camera.getViewProjMatrix() * followCamera;
 		m_programSky.bind();
+		// Texture binding
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );
+		// Uniform binding
+        m_programSky.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programSky.setUniform( "uBgType", m_settings.m_bgType );
 		m_programSky.setUniform( "uExposure", m_settings.m_exposure );
+		m_programSky.setUniform( "uModelViewProjMatrix", skyboxMtx);
 		m_cube.draw();
 		m_programSky.unbind();
 		glDisable( GL_TEXTURE_CUBE_MAP_SEAMLESS );
@@ -690,6 +690,7 @@ namespace {
         m_lightProbes->m_Tex.bind(0);
         m_lightProbes->m_TexIrr.bind(1);
         m_programMesh.bind();
+		// Uniform binding
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
 		m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
@@ -710,7 +711,7 @@ namespace {
 		m_programMesh.setUniform( "uEnvmapIrr", 1 );
 		if (0 == m_settings.m_meshSelection)
 		{
-			m_bunny.render();
+			m_bunny->render();
 		}
 		else
 		{
@@ -773,7 +774,6 @@ namespace {
 					break;
 
 				case GLFW_KEY_R:
-					m_skybox.toggleAutoRotate();
 					break;
 
 				default:

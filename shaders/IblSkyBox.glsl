@@ -1,5 +1,5 @@
 /*
- *          SkyBox.glsl
+ *          IblSkyBox.glsl
  *
  */
 
@@ -41,8 +41,8 @@ in vec3 vDirection;
 layout(location = 0) out vec4 fragColor;
 
 // UNIFORM
-uniform samplerCube uCubemap;
-uniform samplerCube uCubemapIrr;
+uniform samplerCube uEnvmap;
+uniform samplerCube uEnvmapIrr;
 uniform float uBgType;
 uniform float uExposure;
 
@@ -87,19 +87,19 @@ vec3 fixCubeLookup(vec3 _v, float _lod, float _topLevelCubeSize)
 void main()
 {  
   vec3 dir = normalize(vDirection);
-  fragColor = texture( uCubemap, dir );
+  fragColor = texture( uEnvmap, dir );
 
   vec4 color;
 
-  if (u_bgType == 7.0)
+  if (uBgType == 7.0)
   {
-	  color = toLinear(texture(uCubemap, dir));
+	  color = toLinear(texture(uEnvmapIrr, dir));
   }
   else
   {
 	  float lod = uBgType;
 	  dir = fixCubeLookup(dir, lod, 256.0);
-	  color = toLinear(textureLod(uCubemap, dir, lod));
+	  color = toLinear(textureLod(uEnvmap, dir, lod));
   }
   color *= exp2(uExposure);
 

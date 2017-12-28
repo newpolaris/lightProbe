@@ -16,7 +16,7 @@ uniform vec3 uEyePosWS;
 void main()
 {
   // Clip Space position
-  gl_Position = uModelViewProjMatrix * inPosition;
+  gl_Position = uModelViewProjMatrix * uMtxSrt * inPosition;
 
   // World Space normal
   vec3 normal = mat3(uMtxSrt) * inNormal;

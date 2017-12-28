@@ -698,8 +698,6 @@ namespace {
 		m_programMesh.setUniform( "uEnvmap", 0 );
 		m_programMesh.setUniform( "uEnvmapIrr", 1 );
 
-				m_sphere.draw();
-#if 0
 		// Submit orbs.
 		for (float yy = 0, yend = 5.0f; yy < yend; yy+=1.0f)
 		{
@@ -720,7 +718,7 @@ namespace {
 				m_sphere.draw();
 			}
 		}
-#endif
+
         m_programMesh.unbind();
 
         m_lightProbes->m_Tex.unbind(0);

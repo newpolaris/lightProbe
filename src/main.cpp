@@ -131,12 +131,12 @@ namespace
 	bool bCloseApp = false;
 	GLFWwindow* window = nullptr;  
 
-    ProgramShader m_program;
     ProgramShader m_programMesh;
     ProgramShader m_programSky;
 	std::shared_ptr<BaseTexture> m_texture;
     SphereMesh m_sphere( 48, 5.0f );
     FullscreenTriangleMesh m_triangle;
+    CubeMesh m_cube;
 	SkyBox m_skybox;
 	Settings m_settings;
 	ModelPtr m_bunny;
@@ -309,16 +309,12 @@ namespace {
 
         Timer::getInstance().start();
 
-        m_program.initalize();
-        m_program.addShader( GL_VERTEX_SHADER, "Default.Vertex");
-        m_program.addShader( GL_FRAGMENT_SHADER, "Default.Fragment");
-        m_program.link();  
-
         GLuint m_VertexArrayID;
         GL_ASSERT(glGenVertexArrays(1, &m_VertexArrayID));
         GL_ASSERT(glBindVertexArray(m_VertexArrayID));
 
         m_sphere.init();
+		m_cube.init();
 		m_triangle.init();
 
 		m_texture = std::make_shared<BaseTexture>();
@@ -442,10 +438,10 @@ namespace {
 		m_bunny->destroy();
 		m_orb->destroy();
         glswShutdown();  
-        m_program.destroy();
         m_programMesh.destroy();
         m_programSky.destroy();
         m_sphere.destroy();
+		m_cube.destroy();
 		m_triangle.destroy();
         m_texture->destroy();
 		m_skybox.shutdown();
@@ -671,10 +667,26 @@ namespace {
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );    
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
-		// m_programMesh.setUniform( "uBgType", m_settings.m_bgType );
-		m_skybox.render(camera);
+		// Submit view 0.
+		glDisable( GL_DEPTH_TEST );
+		glDepthMask( GL_FALSE );  
+		glDisable( GL_CULL_FACE );  
+		glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );  
+        m_lightProbes->m_Tex.bind(0);
+        m_lightProbes->m_TexIrr.bind(1);
+		m_programSky.bind();
+		m_programSky.setUniform( "uEnvmap", 0 );
+		m_programSky.setUniform( "uEnvmapIrr", 1 );
+		m_programSky.setUniform( "uBgType", m_settings.m_bgType );
+		m_programSky.setUniform( "uExposure", m_settings.m_exposure );
+		m_cube.draw();
+		m_programSky.unbind();
+		glDisable( GL_TEXTURE_CUBE_MAP_SEAMLESS );
+		glEnable( GL_CULL_FACE );
+		glDepthMask( GL_TRUE );
+		glEnable( GL_DEPTH_TEST ); 
 
-        // Use our shader
+		// Sumbit view 1.
         m_lightProbes->m_Tex.bind(0);
         m_lightProbes->m_TexIrr.bind(1);
         m_programMesh.bind();
@@ -693,34 +705,37 @@ namespace {
 		m_programMesh.setUniform( "uLightDir", m_settings.m_lightDir );
 		m_programMesh.setUniform( "uLightCol", m_settings.m_lightCol );
 		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );
-
 		// Texture binding
 		m_programMesh.setUniform( "uEnvmap", 0 );
 		m_programMesh.setUniform( "uEnvmapIrr", 1 );
-
-		// Submit orbs.
-		for (float yy = 0, yend = 5.0f; yy < yend; yy+=1.0f)
+		if (0 == m_settings.m_meshSelection)
 		{
-			for (float xx = 0, xend = 5.0f; xx < xend; xx+=1.0f)
+			m_bunny.render();
+		}
+		else
+		{
+			// Submit orbs.
+			for (float yy = 0, yend = 5.0f; yy < yend; yy+=1.0f)
 			{
-				const float scale   =  1.2f;
-				const float spacing =  2.2f*30;
-				const float yAdj    = -0.8f;
-				glm::vec3 translate(
-						0.0f + (xx/xend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/xend),
-						yAdj/yend + (yy/yend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/yend),
-						0.0f);
-				glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale/xend));
-				glm::mat4 mtxST = glm::translate(mtxS, translate);
-				m_programMesh.setUniform( "uGlossiness", xx*(1.0f/xend) );
-				m_programMesh.setUniform( "uReflectivity", (yend-yy)*(1.0f/yend) );
-				m_programMesh.setUniform( "uMtxSrt", mtxST );
-				m_sphere.draw();
+				for (float xx = 0, xend = 5.0f; xx < xend; xx+=1.0f)
+				{
+					const float scale   =  1.2f;
+					const float spacing =  2.2f*30;
+					const float yAdj    = -0.8f;
+					glm::vec3 translate(
+							0.0f + (xx/xend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/xend),
+							yAdj/yend + (yy/yend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/yend),
+							0.0f);
+					glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale/xend));
+					glm::mat4 mtxST = glm::translate(mtxS, translate);
+					m_programMesh.setUniform( "uGlossiness", xx*(1.0f/xend) );
+					m_programMesh.setUniform( "uReflectivity", (yend-yy)*(1.0f/yend) );
+					m_programMesh.setUniform( "uMtxSrt", mtxST );
+					m_sphere.draw();
+				}
 			}
 		}
-
         m_programMesh.unbind();
-
         m_lightProbes->m_Tex.unbind(0);
         m_lightProbes->m_TexIrr.unbind(0);
 

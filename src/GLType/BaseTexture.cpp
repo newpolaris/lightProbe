@@ -42,7 +42,7 @@ bool BaseTexture::create(const std::string& Filename)
 	glTexParameteri(Target, GL_TEXTURE_WRAP_T, m_WrapT);
 	glTexParameteri(Target, GL_TEXTURE_WRAP_R, m_WrapR);
 	glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, m_MinFilter);
-	glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, m_MagFilter);
+	glTexParameteri(Target, GL_TEXTURE_MAG_FILTER, m_MagFilter);
 
 	glm::tvec3<GLsizei> const Extent(Texture.extent());
 	GLsizei const FaceTotal = static_cast<GLsizei>(Texture.layers() * Texture.faces());

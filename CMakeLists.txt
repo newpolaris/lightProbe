@@ -5,8 +5,6 @@ project (ibl)
 set(APP_TARGET ibl.app)
 
 #if( APPLE )
-#	set( CMAKE_CXX_FLAGS "-ObjC++ --std=c++14" )
-#elseif(UNIX)
     set(CMAKE_CXX_STANDARD 14)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #endif()

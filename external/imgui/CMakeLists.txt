@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.6)
+
+add_definitions(
+	-DUSE_IM_GUI_OTHER_FONT
+	)
 add_library(
         imgui STATIC
         imconfig.h

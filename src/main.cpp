@@ -338,6 +338,9 @@ namespace {
         m_programSky.addShader(GL_VERTEX_SHADER, "IblSkyBox.Vertex");
         m_programSky.addShader(GL_FRAGMENT_SHADER, "IblSkyBox.Fragment");
         m_programSky.link();  
+
+		// to prevent osx input bug
+		fflush(stdout);
 	}
 
 	void initExtension()

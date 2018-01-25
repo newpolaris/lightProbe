@@ -58,6 +58,11 @@ uniform vec3 uLightDir;
 uniform vec3 uLightCol;
 uniform vec3 uRgbDiff;
 uniform vec3 uRgbSpec;
+uniform vec3 uCameraPosition; 
+uniform vec3 uLightPositions[4];
+uniform vec3 uLightColors[4];
+
+const float pi = 3.14159265359;
 
 vec3 calcFresnel(vec3 _cspec, float _dot, float _strength)
 {
@@ -181,6 +186,33 @@ vec3 toGammaAccurate(vec3 _rgb)
 vec4 toGammaAccurate(vec4 _rgba)
 {
 	return vec4(toGammaAccurate(_rgba.xyz), _rgba.w);
+}
+
+// use code from learnOpenGL
+float distributionGGX(float _ndoth, float roughness)
+{
+	// due to alpha = roughness^2
+	float a = roughness*roughness;
+	float a2 = a*a;
+	float denom = _ndoth*_ndoth * (a2 - 1.0) + 1.0;
+	denom = max(0.001, denom);
+	return a2 / (pi * denom * denom);
+}
+
+float geometrySchlickGGX(float _ndotv, float roughness)
+{
+	float r = roughness + 1.0;
+	float k = r*r / 8.0;
+	float nom = _ndotv;
+	float denom = _ndotv * (1.0 - k) + k;
+	return nom / denom;
+}
+
+float geometrySmith(float _ndotv, float _ndotl, float roughness)
+{
+	float ggx2 = geometrySchlickGGX(_ndotv, roughness);
+	float ggx1 = geometrySchlickGGX(_ndotv, roughness);
+	return ggx1 * ggx2;
 }
 
 void main()

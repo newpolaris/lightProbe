@@ -1,8 +1,8 @@
 # CMake entry point
 cmake_minimum_required (VERSION 3.0)
-project (ibl)
+project (lightProbe)
 
-set(APP_TARGET ibl.app)
+set(APP_TARGET lightProbe.app)
 
 #if( APPLE )
     set(CMAKE_CXX_STANDARD 14)

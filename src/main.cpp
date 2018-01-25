@@ -74,8 +74,8 @@ struct Settings
 	{
 		m_envRotCurr = 0.0f;
 		m_envRotDest = 0.0f;
-		m_lightDir = glm::vec3(-0.8f, 0.2f, -0.5f);
-		m_lightCol = glm::vec3(1.f);
+		m_lightDir = glm::vec3(0.8f, 0.2f, 0.5f);
+		m_lightCol = glm::vec3(0.5f, 0.f, 0.f);
 		m_glossiness = 0.7f;
 		m_exposure = 0.0f;
 		m_bgType = 3.0f;
@@ -84,15 +84,15 @@ struct Settings
 		m_rgbDiff = glm::vec3(1.f);
 		m_rgbSpec = glm::vec3(1.f);
 		m_lod = 0.0f;
-		m_doDiffuse = false;
-		m_doSpecular = false;
-		m_doDiffuseIbl = true;
-		m_doSpecularIbl = true;
+		m_doDiffuse = true;
+		m_doSpecular = true;
+		m_doDiffuseIbl = false;
+		m_doSpecularIbl = false;
 		m_showLightColorWheel = true;
 		m_showDiffColorWheel = true;
 		m_showSpecColorWheel = true;
 		m_metalOrSpec = 0;
-		m_meshSelection = 0;
+		m_meshSelection = 1;
 	}
 
 	float m_envRotCurr;
@@ -289,12 +289,12 @@ namespace {
 
 		// Load FontsR
 		// (there is a default font, this is only if you want to change it. see extra_fonts/README.txt for more details)
-		//ImGuiIO& io = ImGui::GetIO();
-		//io.Fonts->AddFontDefault();
-		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/Cousine-Regular.ttf", 15.0f);
-		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/DroidSans.ttf", 16.0f);
-		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyClean.ttf", 13.0f);
-		//io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyTiny.ttf", 10.0f);
+		// ImGuiIO& io = ImGui::GetIO();
+		// io.Fonts->AddFontDefault();
+		// io.Fonts->AddFontFromFileTTF("../../extra_fonts/Cousine-Regular.ttf", 15.0f);
+		// io.Fonts->AddFontFromFileTTF("../../extra_fonts/DroidSans.ttf", 16.0f);
+		// io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyClean.ttf", 13.0f);
+		// io.Fonts->AddFontFromFileTTF("../../extra_fonts/ProggyTiny.ttf", 10.0f);
 
 		// GLSW : shader file manager
 		glswInit();
@@ -302,7 +302,7 @@ namespace {
 		glswAddDirectiveToken("*", "#version 330 core");
 
         // App Objects
-        camera.setViewParams( glm::vec3( 0.0f, 2.0f, 15.0f), glm::vec3( 0.0f, 0.0f, 0.0f) );
+        camera.setViewParams( glm::vec3( 5.0f, 5.0f, 20.0f), glm::vec3( 5.0f, 5.0f, 0.0f) );
         camera.setMoveCoefficient(0.35f);
 
         Timer::getInstance().start();
@@ -708,6 +708,7 @@ namespace {
 		m_programMesh.setUniform( "uLightDir", m_settings.m_lightDir );
 		m_programMesh.setUniform( "uLightCol", m_settings.m_lightCol );
 		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );
+		// m_programMesh.setUniform( "", glm::vec);
 		// Texture binding
 		m_programMesh.setUniform( "uEnvmap", 0 );
 		m_programMesh.setUniform( "uEnvmapIrr", 1 );

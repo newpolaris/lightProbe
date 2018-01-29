@@ -698,13 +698,13 @@ namespace {
 		m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
 		m_programMesh.setUniform( "uReflectivity", m_settings.m_reflectivity );
 		m_programMesh.setUniform( "uExposure", m_settings.m_exposure );
-		m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
-		m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
+		// m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
+		// m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
 		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
 		m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
-		m_programMesh.setUniform( "ubMetalOrSpec", float(m_settings.m_metalOrSpec) );
+		// m_programMesh.setUniform( "ubMetalOrSpec", float(m_settings.m_metalOrSpec) );
 		m_programMesh.setUniform( "uRgbDiff", m_settings.m_rgbDiff );
-		m_programMesh.setUniform( "uRgbSpec", m_settings.m_rgbSpec );
+		// m_programMesh.setUniform( "uRgbSpec", m_settings.m_rgbSpec );
 		m_programMesh.setUniform( "uLightDir", m_settings.m_lightDir );
 		m_programMesh.setUniform( "uLightCol", m_settings.m_lightCol );
 		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );

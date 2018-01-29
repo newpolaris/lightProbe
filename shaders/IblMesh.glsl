@@ -211,7 +211,7 @@ float geometrySchlickGGX(float _ndotv, float roughness)
 float geometrySmith(float _ndotv, float _ndotl, float roughness)
 {
 	float ggx2 = geometrySchlickGGX(_ndotv, roughness);
-	float ggx1 = geometrySchlickGGX(_ndotv, roughness);
+	float ggx1 = geometrySchlickGGX(_ndotl, roughness);
 	return ggx1 * ggx2;
 }
 
@@ -236,24 +236,37 @@ void main()
   float inReflectivity = uReflectivity;
   float inGloss = uGlossiness;
 
-  // Reflection.
-  vec3 refl;
-  if (0.0 == ubMetalOrSpec) // Metalness workflow.
-  {
-      refl = mix(vec3(0.04), inAlbedo, inReflectivity);
-  }
-  else // Specular workflow.
-  {
-      refl = uRgbSpec * vec3(inReflectivity);
-  }
+  // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
+  // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    
+  vec3 f0 = mix(vec3(0.04), inAlbedo, inReflectivity);
 
+  vec3 dirFresnel = calcFresnel(f0, hdotv, inGloss);
+  vec3 envFresnel = calcFresnel(f0, ndotv, inGloss);
+
+  // multiply kD by the inverse metalness such that only non-metals 
+  // have diffuse lighting, or a linear blend if partly metal (pure metals
+  // have no diffuse light).
   vec3 albedo = inAlbedo * (1.0 - inReflectivity);
-  vec3 dirFresnel = calcFresnel(refl, hdotv, inGloss);
-  vec3 envFresnel = calcFresnel(refl, ndotv, inGloss);
 
-  vec3 lambert = ubDiffuse  * calcLambert(albedo * (1.0 - dirFresnel), ndotl);
-  vec3 blinn   = ubSpecular * calcBlinn(dirFresnel, ndoth, ndotl, specPwr(inGloss));
-  vec3 direct  = (lambert + blinn)*clight;
+  float d = distributionGGX(ndoth, 1-inGloss);
+  float g = geometrySmith(ndotv, ndotl, 1-inGloss);
+  vec3 f = calcFresnel(f0, hdotv, 1.0);
+
+  vec3 nominator = d * g * f;
+  // prevent divide by zero
+  float denominator = max(0.001, 4 * ndotv * ndotl); 
+  vec3 specular = nominator / denominator;
+
+  // kS is equal to Fresnel
+  vec3 kS = f;
+  // for energy conservation, the diffuse and specular light can't
+  // be above 1.0 (unless the surface emits light); to preserve this
+  // relationship the diffuse component (kD) should equal 1.0 - kS.
+  vec3 kD = vec3(1.0) - kS;
+
+  // scale light by NdotL
+  vec3 diffuse = kD * albedo / pi;
+  vec3 direct = (diffuse + specular)*clight*ndotl;
 
   // Note: Environment textures are filtered with cmft: https://github.com/dariomanesku/cmft
   // Params used:

@@ -10,6 +10,7 @@
 #include <tools/ImageLoader.hpp>
 #include <tools/Timer.hpp>
 #include <gli/gli.hpp>
+#include <tools/gltools.hpp>
 #include "irradianceEnvMap.h"
 #include "Texture.h"
 
@@ -86,6 +87,7 @@ bool Texture2D::load(const std::string &name)
 	}
 	unbind();
 
+	CHECKGLERROR();
 
 	return true;
 }

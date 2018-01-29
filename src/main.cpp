@@ -758,10 +758,10 @@ namespace {
 		// Texture binding
 		m_programMesh.setUniform( "uEnvmap", 0 );
 		m_programMesh.setUniform( "uEnvmapIrr", 1 );
-		m_programMesh.setUniform( "uAlbedoMap", 2 );
-		m_programMesh.setUniform( "uNormalMap", 3 );
-		m_programMesh.setUniform( "uMetallicMap", 4 );
-		m_programMesh.setUniform( "uRoughnessMap", 5 );
+		// m_programMesh.setUniform( "uAlbedoMap", 2 );
+		// m_programMesh.setUniform( "uNormalMap", 3 );
+		// m_programMesh.setUniform( "uMetallicMap", 4 );
+		// m_programMesh.setUniform( "uRoughnessMap", 5 );
 
 		if (0 == m_settings.m_meshSelection)
 		{

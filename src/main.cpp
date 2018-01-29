@@ -44,6 +44,28 @@
 #include <vector>
 #include <algorithm>
 
+
+namespace {
+    // lights
+    // ------
+    glm::vec3 lightPositions[] = {
+        glm::vec3(-10.0f,  10.0f, 15.0f),
+        glm::vec3( 10.0f,  10.0f, 15.0f),
+        glm::vec3(-10.0f, -10.0f, 15.0f),
+        glm::vec3( 10.0f, -10.0f, 15.0f),
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f)
+    };
+
+    int nrRows    = 7;
+    int nrColumns = 7;
+    float spacing = 2.5;
+}
+
 struct LightProbe
 {
 	enum Enum
@@ -81,7 +103,7 @@ struct Settings
 		m_bgType = 3.0f;
 		m_radianceSlider = 2.0f;
 		m_reflectivity = 0.85f;
-		m_rgbDiff = glm::vec3(1.f);
+		m_rgbDiff = glm::vec3(0.5f, 0.f, 0.f);
 		m_rgbSpec = glm::vec3(1.f);
 		m_lod = 0.0f;
 		m_doDiffuse = true;
@@ -133,7 +155,10 @@ namespace
 
     ProgramShader m_programMesh;
     ProgramShader m_programSky;
-	std::shared_ptr<BaseTexture> m_texture;
+	Texture m_albedoTex;
+	Texture m_normalTex;
+	Texture m_metallicTex;
+	Texture m_roughnessTex;
     SphereMesh m_sphere( 48, 5.0f );
     FullscreenTriangleMesh m_triangle;
     CubeMesh m_cube;
@@ -315,7 +340,15 @@ namespace {
 		m_cube.init();
 		m_triangle.init();
 
-		m_texture = std::make_shared<BaseTexture>();
+		m_albedoTex.initialize();
+		m_normalTex.initialize();
+		m_metallicTex.initialize();
+		m_roughnessTex.initialize();
+
+		m_albedoTex.load("resource/rusted_iron/albedo.png");
+		m_normalTex.load("resource/rusted_iron/normal.png");
+		m_metallicTex.load("resource/rusted_iron/metallic.png");
+		m_roughnessTex.load("resource/rusted_iron/roughness.png");
 
 		m_bunny = std::make_shared<ModelAssImp>();
 		m_bunny->create();
@@ -440,7 +473,10 @@ namespace {
         m_sphere.destroy();
 		m_cube.destroy();
 		m_triangle.destroy();
-        m_texture->destroy();
+		m_albedoTex.destroy();
+		m_normalTex.destroy();
+		m_metallicTex.destroy();
+		m_roughnessTex.destroy();
         Logger::getInstance().close();
 		ImGui_ImplGlfwGL3_Shutdown();
 		glfwTerminate();
@@ -691,27 +727,42 @@ namespace {
 		// Sumbit view 1.
         m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
         m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
+		m_albedoTex.bind(2);
+		m_normalTex.bind(3);
+		m_metallicTex.bind(4);
+		m_roughnessTex.bind(5);
         m_programMesh.bind();
+
 		// Uniform binding
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
-		m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
-		m_programMesh.setUniform( "uReflectivity", m_settings.m_reflectivity );
+		// m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
+		// m_programMesh.setUniform( "uReflectivity", m_settings.m_reflectivity );
 		m_programMesh.setUniform( "uExposure", m_settings.m_exposure );
 		// m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
 		// m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
 		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
 		m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
 		// m_programMesh.setUniform( "ubMetalOrSpec", float(m_settings.m_metalOrSpec) );
-		m_programMesh.setUniform( "uRgbDiff", m_settings.m_rgbDiff );
+		// m_programMesh.setUniform( "uRgbDiff", m_settings.m_rgbDiff );
 		// m_programMesh.setUniform( "uRgbSpec", m_settings.m_rgbSpec );
-		m_programMesh.setUniform( "uLightDir", m_settings.m_lightDir );
-		m_programMesh.setUniform( "uLightCol", m_settings.m_lightCol );
+		// m_programMesh.setUniform( "uLightDir", m_settings.m_lightDir );
+		// m_programMesh.setUniform( "uLightCol", m_settings.m_lightCol );
 		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );
-		// m_programMesh.setUniform( "", glm::vec);
+		for (unsigned int i = 0; i < 4; i++) {
+			std::string idx = "[" + std::to_string(i) + "]";
+			m_programMesh.setUniform("uLightPositions" + idx, lightPositions[i]);
+			m_programMesh.setUniform("uLightColors" + idx, lightColors[i]);
+		}
+
 		// Texture binding
 		m_programMesh.setUniform( "uEnvmap", 0 );
 		m_programMesh.setUniform( "uEnvmapIrr", 1 );
+		m_programMesh.setUniform( "uAlbedoMap", 2 );
+		m_programMesh.setUniform( "uNormalMap", 3 );
+		m_programMesh.setUniform( "uMetallicMap", 4 );
+		m_programMesh.setUniform( "uRoughnessMap", 5 );
+
 		if (0 == m_settings.m_meshSelection)
 		{
 			m_bunny->render();
@@ -732,8 +783,8 @@ namespace {
 							0.0f);
 					glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale/xend));
 					glm::mat4 mtxST = glm::translate(mtxS, translate);
-					m_programMesh.setUniform( "uGlossiness", xx*(1.0f/xend) );
-					m_programMesh.setUniform( "uReflectivity", (yend-yy)*(1.0f/yend) );
+					// m_programMesh.setUniform( "uGlossiness", xx*(1.0f/xend) );
+					// m_programMesh.setUniform( "uReflectivity", (yend-yy)*(1.0f/yend) );
 					m_programMesh.setUniform( "uMtxSrt", mtxST );
 					m_sphere.draw();
 				}
@@ -742,6 +793,10 @@ namespace {
         m_programMesh.unbind();
         m_lightProbes[m_currentLightProbe].m_Tex.unbind(0);
         m_lightProbes[m_currentLightProbe].m_TexIrr.unbind(0);
+		m_albedoTex.unbind(0);
+		m_normalTex.unbind(0);
+		m_metallicTex.unbind(0);
+		m_roughnessTex.unbind(0);
 
 		renderHUD();
     }

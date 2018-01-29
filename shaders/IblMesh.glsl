@@ -3,10 +3,13 @@
 // IN
 layout(location = 0) in vec4 inPosition;
 layout(location = 1) in vec3 inNormal;
+layout(location = 2) in vec2 inTexcoords;
 
 // OUT
 out vec3 vNormalWS;
 out vec3 vViewDirWS;
+out vec3 vWorldPosWS;
+out vec2 vTexcoords;
 
 // UNIFORM
 uniform mat4 uMtxSrt;
@@ -21,10 +24,13 @@ void main()
   // World Space normal
   vec3 normal = mat3(uMtxSrt) * inNormal;
   vNormalWS = normalize(normal);
+
+  vTexcoords = inTexcoords;
   
   // World Space view direction from world space position
   vec3 posWS = vec3((uMtxSrt * inPosition).xyz);
   vViewDirWS = normalize(uEyePosWS - posWS);
+  vWorldPosWS = posWS;
 }
 
 
@@ -38,6 +44,8 @@ void main()
 // IN
 in vec3 vNormalWS;
 in vec3 vViewDirWS;
+in vec3 vWorldPosWS;
+in vec2 vTexcoords;
 
 // OUT
 layout(location = 0) out vec4 fragColor;
@@ -45,20 +53,21 @@ layout(location = 0) out vec4 fragColor;
 // UNIFORM
 uniform samplerCube uEnvmap;
 uniform samplerCube uEnvmapIrr;
+uniform sampler2D uAlbedoMap;
+uniform sampler2D uNormalMap;
+uniform sampler2D uMetallicMap;
+uniform sampler2D uRoughnessMap;
 
 uniform float ubMetalOrSpec;
 uniform float ubDiffuse;
 uniform float ubSpecular;
 uniform float ubDiffuseIbl;
 uniform float ubSpecularIbl;
-uniform float uGlossiness;
-uniform float uReflectivity;
 uniform float uExposure;
-uniform vec3 uLightDir;
-uniform vec3 uLightCol;
-uniform vec3 uRgbDiff;
-uniform vec3 uRgbSpec;
-uniform vec3 uCameraPosition; 
+// uniform vec3 uLightDir;
+// uniform vec3 uLightCol;
+// uniform vec3 uRgbDiff;
+// uniform vec3 uRgbSpec;
 uniform vec3 uLightPositions[4];
 uniform vec3 uLightColors[4];
 
@@ -215,58 +224,83 @@ float geometrySmith(float _ndotv, float _ndotl, float roughness)
 	return ggx1 * ggx2;
 }
 
+mat3 calcTbn(vec3 _normal, vec3 _worldPos, vec2 _texCoords)
+{
+    vec3 Q1  = dFdx(_worldPos);
+    vec3 Q2  = dFdy(_worldPos);
+    vec2 st1 = dFdx(_texCoords);
+    vec2 st2 = dFdy(_texCoords);
+
+    vec3 N   = _normal;
+    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
+    vec3 B  = -normalize(cross(N, T));
+    return mat3(T, B, N);
+}
+
 void main()
 {  
-  // Light.
-  vec3 ld = normalize(uLightDir);
-  vec3 clight = uLightCol;
-
-  // Input.
-  vec3 nn = normalize(vNormalWS);
-  vec3 vv = normalize(vViewDirWS);
-  vec3 hh = normalize(vv + ld);
-
-  float ndotv = clamp(dot(nn, vv), 0.0, 1.0);
-  float ndotl = clamp(dot(nn, ld), 0.0, 1.0);
-  float ndoth = clamp(dot(nn, hh), 0.0, 1.0);
-  float hdotv = clamp(dot(hh, vv), 0.0, 1.0);
-
   // Material params.
-  vec3  inAlbedo = uRgbDiff;
-  float inReflectivity = uReflectivity;
-  float inGloss = uGlossiness;
+  vec3  inAlbedo = toLinear(texture(uAlbedoMap, vTexcoords).rgb);
+  float inMetallic = texture(uMetallicMap, vTexcoords).r;
+  float inRoughness = texture(uRoughnessMap, vTexcoords).r;
 
   // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
   // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    
-  vec3 f0 = mix(vec3(0.04), inAlbedo, inReflectivity);
+  vec3 f0 = mix(vec3(0.04), inAlbedo, inMetallic);
 
-  vec3 dirFresnel = calcFresnel(f0, hdotv, inGloss);
-  vec3 envFresnel = calcFresnel(f0, ndotv, inGloss);
+  // vec3 envFresnel = calcFresnel(f0, ndotv, 1-inRoughness);
 
   // multiply kD by the inverse metalness such that only non-metals 
   // have diffuse lighting, or a linear blend if partly metal (pure metals
   // have no diffuse light).
-  vec3 albedo = inAlbedo * (1.0 - inReflectivity);
+  vec3 albedo = inAlbedo * (1.0 - inMetallic);
 
-  float d = distributionGGX(ndoth, 1-inGloss);
-  float g = geometrySmith(ndotv, ndotl, 1-inGloss);
-  vec3 f = calcFresnel(f0, hdotv, 1.0);
+  // Input.
+  vec3 nn = normalize(vNormalWS);
+  vec3 vv = normalize(vViewDirWS);
 
-  vec3 nominator = d * g * f;
-  // prevent divide by zero
-  float denominator = max(0.001, 4 * ndotv * ndotl); 
-  vec3 specular = nominator / denominator;
+  mat3 tbn = calcTbn(nn, vWorldPosWS, vTexcoords);
+  vec3 tangentNormal = texture(uNormalMap, vTexcoords).xyz * 2.0 - 1.0;
+  // nn = normalize(tbn * tangentNormal);
 
-  // kS is equal to Fresnel
-  vec3 kS = f;
-  // for energy conservation, the diffuse and specular light can't
-  // be above 1.0 (unless the surface emits light); to preserve this
-  // relationship the diffuse component (kD) should equal 1.0 - kS.
-  vec3 kD = vec3(1.0) - kS;
+  // reflectance equation
+  vec3 direct = vec3(0.0);
+  // direct += toLinear(texture(uEnvmapIrr, nn).xyz);
+  direct += toLinear(texture(uAlbedoMap, nn.xy).xyz);
+  for (int i = 0; i < 4; ++i)
+  {
+	  // calculate per-light radiance
+	  vec3 ld = normalize(uLightPositions[i] - vWorldPosWS);
+	  vec3 hh = normalize(vv + ld);
+	  float distance = length(uLightPositions[i] - vWorldPosWS);
+	  float attenuation = 1.0 / (distance*distance);
+	  vec3 radiance = uLightColors[i] * attenuation;
 
-  // scale light by NdotL
-  vec3 diffuse = kD * albedo / pi;
-  vec3 direct = (diffuse + specular)*clight*ndotl;
+	  float ndotv = clamp(dot(nn, vv), 0.0, 1.0);
+	  float ndotl = clamp(dot(nn, ld), 0.0, 1.0);
+	  float ndoth = clamp(dot(nn, hh), 0.0, 1.0);
+	  float hdotv = clamp(dot(hh, vv), 0.0, 1.0);
+
+	  float d = distributionGGX(ndoth, inRoughness);
+	  float g = geometrySmith(ndotv, ndotl, inRoughness);
+	  vec3 f = calcFresnel(f0, hdotv, 1.0);
+
+	  vec3 nominator = d * g * f;
+	  // prevent divide by zero
+	  float denominator = max(0.001, 4 * ndotv * ndotl); 
+	  vec3 specular = nominator / denominator;
+
+	  // kS is equal to Fresnel
+	  vec3 kS = f;
+	  // for energy conservation, the diffuse and specular light can't
+	  // be above 1.0 (unless the surface emits light); to preserve this
+	  // relationship the diffuse component (kD) should equal 1.0 - kS.
+	  vec3 kD = vec3(1.0) - kS;
+
+	  // scale light by NdotL
+	  vec3 diffuse = kD * albedo / pi;
+	  direct += (diffuse + specular)*radiance*ndotl;
+  }
 
   // Note: Environment textures are filtered with cmft: https://github.com/dariomanesku/cmft
   // Params used:
@@ -275,7 +309,10 @@ void main()
   // --glossScale 10    //!< Spec power scale. See: specPwr().
   // --glossBias 2      //!< Spec power bias. See: specPwr().
   // --edgeFixup warp   //!< This must be used on DirectX9. When fileted with 'warp', fixCubeLookup() should be used.
-  float mip = 1.0 + 5.0*(1.0 - inGloss); // Use mip levels [1..6] for radiance.
+  float mip = 1.0 + 5.0*inRoughness; // Use mip levels [1..6] for radiance.
+
+  vec3 ndotv = vec3(0.0);
+  vec3 envFresnel = vec3(0.0);
 
   vec3 vr = 2.0*ndotv*nn - vv; // Same as: -reflect(vv, nn);
   vec3 cubeR = normalize(vr);

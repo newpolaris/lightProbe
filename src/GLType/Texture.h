@@ -44,7 +44,7 @@ class Texture
     
     
     /** Return the texture target */
-    virtual GLenum getTarget() const { return GL_INVALID_ENUM; }
+    virtual GLenum getTarget() const { assert(false); return GL_INVALID_ENUM; }
     
     /** Generate the texture id */
     void initialize();

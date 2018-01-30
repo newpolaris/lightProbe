@@ -124,6 +124,11 @@ struct Image_t
         data[idx+2u] = bits[end-idx+0u];
       }
     }
+	else if (bytesPerPixel == 1)
+	{
+      for (size_t j=0u; j<numPixels; ++j)
+		data[j] = bits[numPixels-j-1];
+	}
 
     FreeImage_Unload(image);
     

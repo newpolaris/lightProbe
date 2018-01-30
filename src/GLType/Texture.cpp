@@ -38,6 +38,8 @@ void Texture::bind(GLuint unit) const
 	assert( 0u != m_id );  
 	glActiveTexture( GL_TEXTURE0 + unit );
 	glBindTexture( getTarget(), m_id);
+
+	CHECKGLERROR();
 }
 
 void Texture::unbind(GLuint unit) const
@@ -119,7 +121,7 @@ bool Texture2D::load( GLint internalFormat, GLsizei width, GLsizei height, GLenu
 		glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, data); 
 
 #if ENABLE_TEXTURE_MIPMAP
-	glGenerateMipmap( GL_TEXTURE_2D );  
+		glGenerateMipmap( GL_TEXTURE_2D );  
 #endif  
 	}
 	unbind();

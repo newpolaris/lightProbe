@@ -155,10 +155,10 @@ namespace
 
     ProgramShader m_programMesh;
     ProgramShader m_programSky;
-	Texture m_albedoTex;
-	Texture m_normalTex;
-	Texture m_metallicTex;
-	Texture m_roughnessTex;
+	Texture2D m_albedoTex;
+	Texture2D m_normalTex;
+	Texture2D m_metallicTex;
+	Texture2D m_roughnessTex;
     SphereMesh m_sphere( 48, 5.0f );
     FullscreenTriangleMesh m_triangle;
     CubeMesh m_cube;
@@ -340,16 +340,6 @@ namespace {
 		m_cube.init();
 		m_triangle.init();
 
-		m_albedoTex.initialize();
-		m_normalTex.initialize();
-		m_metallicTex.initialize();
-		m_roughnessTex.initialize();
-
-		m_albedoTex.load("resource/rusted_iron/albedo.png");
-		m_normalTex.load("resource/rusted_iron/normal.png");
-		m_metallicTex.load("resource/rusted_iron/metallic.png");
-		m_roughnessTex.load("resource/rusted_iron/roughness.png");
-
 		m_bunny = std::make_shared<ModelAssImp>();
 		m_bunny->create();
 		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
@@ -360,6 +350,18 @@ namespace {
 		m_lightProbes[LightProbe::Bolonga].load("bolonga");
 		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
         m_currentLightProbe = LightProbe::Bolonga;
+
+		m_albedoTex.initialize();
+		m_albedoTex.load("resource/rusted_iron/albedo.png");
+
+		m_normalTex.initialize();
+		m_normalTex.load("resource/rusted_iron/normal.png");
+
+		m_metallicTex.initialize();
+		m_metallicTex.load("resource/rusted_iron/metallic.png");
+
+		m_roughnessTex.initialize();
+		m_roughnessTex.load("resource/rusted_iron/roughness.png");
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -730,9 +732,12 @@ namespace {
 		m_albedoTex.bind(2);
 		m_normalTex.bind(3);
 		m_metallicTex.bind(4);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		m_roughnessTex.bind(5);
         m_programMesh.bind();
-
 		// Uniform binding
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
@@ -758,11 +763,10 @@ namespace {
 		// Texture binding
 		m_programMesh.setUniform( "uEnvmap", 0 );
 		m_programMesh.setUniform( "uEnvmapIrr", 1 );
-		// m_programMesh.setUniform( "uAlbedoMap", 2 );
-		// m_programMesh.setUniform( "uNormalMap", 3 );
-		// m_programMesh.setUniform( "uMetallicMap", 4 );
-		// m_programMesh.setUniform( "uRoughnessMap", 5 );
-
+		m_programMesh.setUniform( "uAlbedoMap", 2 );
+		m_programMesh.setUniform( "uNormalMap", 3 );
+		m_programMesh.setUniform( "uMetallicMap", 4 );
+		m_programMesh.setUniform( "uRoughnessMap", 5 );
 		if (0 == m_settings.m_meshSelection)
 		{
 			m_bunny->render();
@@ -797,7 +801,6 @@ namespace {
 		m_normalTex.unbind(0);
 		m_metallicTex.unbind(0);
 		m_roughnessTex.unbind(0);
-
 		renderHUD();
     }
 

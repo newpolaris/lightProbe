@@ -239,7 +239,7 @@ mat3 calcTbn(vec3 _normal, vec3 _worldPos, vec2 _texCoords)
 
 void main()
 {  
-  // Material params.
+  // Material params. uMetallicMap
   vec3  inAlbedo = toLinear(texture(uAlbedoMap, vTexcoords).rgb);
   float inMetallic = texture(uMetallicMap, vTexcoords).r;
   float inRoughness = texture(uRoughnessMap, vTexcoords).r;
@@ -265,8 +265,6 @@ void main()
 
   // reflectance equation
   vec3 direct = vec3(0.0);
-  // direct += toLinear(texture(uEnvmapIrr, nn).xyz);
-  direct += toLinear(texture(uAlbedoMap, nn.xy).xyz);
   for (int i = 0; i < 4; ++i)
   {
 	  // calculate per-light radiance

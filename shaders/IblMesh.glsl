@@ -261,7 +261,7 @@ void main()
 
   mat3 tbn = calcTbn(nn, vWorldPosWS, vTexcoords);
   vec3 tangentNormal = texture(uNormalMap, vTexcoords).xyz * 2.0 - 1.0;
-  // nn = normalize(tbn * tangentNormal);
+  nn = normalize(tbn * tangentNormal);
 
   // reflectance equation
   vec3 direct = vec3(0.0);
@@ -326,6 +326,7 @@ void main()
   // Color.
   vec3 color = direct + indirect;
   color = color * exp2(uExposure);
+  // TODO: is gamma correction needed?
   fragColor.xyz = toFilmic(color);
   fragColor.w = 1.0;
 }

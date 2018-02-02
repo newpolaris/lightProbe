@@ -769,8 +769,9 @@ namespace {
 		// 5. convert HDR equirectangular environment map to cubemap equivalent
 		ProgramShader equirectangularToCubemapShader;
 		equirectangularToCubemapShader.initalize();
-        equirectangularToCubemapShader.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
-        equirectangularToCubemapShader.addShader(GL_FRAGMENT_SHADER, "IblMesh.Fragment");
+        // TODO: change to cubemap.Vertex
+        equirectangularToCubemapShader.addShader(GL_VERTEX_SHADER, "EquirectangularToCubemap.Vertex");
+        equirectangularToCubemapShader.addShader(GL_FRAGMENT_SHADER, "EquirectangularToCubemap.Fragment");
         equirectangularToCubemapShader.link();  
 		equirectangularToCubemapShader.bind();
 		equirectangularToCubemapShader.setUniform("equirectangularMap", 0);
@@ -787,7 +788,7 @@ namespace {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			// m_cube.draw();
+			m_cube.draw();
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
@@ -824,7 +825,7 @@ namespace {
         m_programSky.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programSky.setUniform( "uBgType", m_settings.m_bgType );
 		m_programSky.setUniform( "uExposure", m_settings.m_exposure );
-		m_programSky.setUniform( "uModelViewProjMatrix", skyboxMtx);
+		m_programSky.setUniform( "uModelViewProjMatrix", skyboxMtx );
 		m_cube.draw();
 		m_programSky.unbind();
 		glDisable( GL_TEXTURE_CUBE_MAP_SEAMLESS );

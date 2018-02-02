@@ -16,12 +16,14 @@ layout(location = 1) in vec3 inNormal;
 out vec3 vDirection;
 
 // UNIFORM
-uniform mat4 uModelViewProjMatrix;
-
+uniform mat4 uViewMatrix;
+uniform mat4 uProjMatrix;
 
 void main()
 {
-  gl_Position = uModelViewProjMatrix * inPosition;
+  mat4 rotView = mat4(mat3(uViewMatrix));
+  vec4 clipPos = uProjMatrix * rotView * inPosition;
+  gl_Position = clipPos.xyww;
 
   vDirection = inPosition.xyz;
 }

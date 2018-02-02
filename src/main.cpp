@@ -822,10 +822,10 @@ namespace {
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );
 		// Uniform binding
-        m_programSky.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
+        m_programSky.setUniform( "uViewMatrix", camera.getViewMatrix() );
+        m_programSky.setUniform( "uProjMatrix", camera.getProjectionMatrix() );
 		m_programSky.setUniform( "uBgType", m_settings.m_bgType );
 		m_programSky.setUniform( "uExposure", m_settings.m_exposure );
-		m_programSky.setUniform( "uModelViewProjMatrix", skyboxMtx );
 		m_cube.draw();
 		m_programSky.unbind();
 		glDisable( GL_TEXTURE_CUBE_MAP_SEAMLESS );

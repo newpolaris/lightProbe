@@ -424,7 +424,6 @@ void CubeMesh::draw() const
 {
   assert( m_bInitialized );    
   
-  
   m_vertexBuffer.enable();
     glDrawArrays( GL_TRIANGLES, 0, m_count);
   m_vertexBuffer.disable(); 

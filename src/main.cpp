@@ -28,6 +28,7 @@
 #include <imgui/imgui_impl_glfw_gl3.h>
 
 #include <tools/stb_image.h>
+
 #include <tools/TCamera.hpp>
 #include <tools/Timer.hpp>
 #include <tools/Logger.hpp>
@@ -711,35 +712,13 @@ namespace {
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
 		// 2. load the HDR environment map
-//        Texture2D newportTex;
-//        newportTex.initialize();
-//        if (!newportTex.load("resource/newport_loft.hdr"))
-//        {
-//            fprintf( stderr, "fail to load texture" );
-//            glfwTerminate();
-//            exit( EXIT_FAILURE );
-//        }
-		stbi_set_flip_vertically_on_load(true);
-		int width, height, nrComponents;
-		float *data = stbi_loadf("resource/newport_loft.hdr", &width, &height, &nrComponents, 0);
-		unsigned int hdrTexture;
-		if (data)
-		{
-			glGenTextures(1, &hdrTexture);
-			glBindTexture(GL_TEXTURE_2D, hdrTexture);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data); // note how we specify the texture's data value to be float
-
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-			stbi_image_free(data);
-		}
-		else
-		{
-			std::cout << "Failed to load HDR image." << std::endl;
-		}
+        BaseTexture newportTex;
+        if (!newportTex.create("resource/newport_loft.hdr"))
+        {
+            fprintf(stderr, "fail to load texture");
+            glfwTerminate();
+            exit(EXIT_FAILURE);
+        }
 
 		// 3. setup cubemap to render to and attach to framebuffer
 		glGenTextures(1, &envCubemap);
@@ -777,8 +756,7 @@ namespace {
 		equirectangularToCubemapShader.setUniform("equirectangularMap", 0);
 		equirectangularToCubemapShader.setUniform("projection", captureProjection);
 
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, hdrTexture);
+        newportTex.bind(0);
 
 		glViewport(0, 0, 512, 512); // don't forget to configure the viewport to the capture dimensions.
 		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);

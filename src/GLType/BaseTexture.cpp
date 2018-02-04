@@ -1,7 +1,76 @@
 #include <gli/gli.hpp>
+#include <tools/stb_image.h>
 #include "BaseTexture.h"
 
+namespace {
+    std::string GetFileExtension(const std::string& Filename)
+    {
+        return Filename.substr(Filename.find_last_of(".") + 1);
+    }
+
+    bool Stricompare(const std::string& str1, const std::string& str2) {
+        std::string str1Cpy(str1);
+        std::string str2Cpy(str2);
+        std::transform(str1Cpy.begin(), str1Cpy.end(), str1Cpy.begin(), ::tolower);
+        std::transform(str2Cpy.begin(), str2Cpy.end(), str2Cpy.begin(), ::tolower);
+        return (str1Cpy == str2Cpy);
+    }
+
+    GLenum GetComponent(int Components)
+    {
+        switch (Components)
+        {
+        case 1u:
+            return GL_R;
+        case 2u:
+            return GL_RG;
+        case 3u:
+            return GL_RGB;
+        case 4u:
+            return GL_RGBA;
+        default:
+            assert(false);
+        };
+        return 0;
+    }
+
+    GLenum GetInternalComponent(int Components, bool bFloat)
+    {
+        GLenum Base = GetComponent(Components);
+        if (bFloat)
+        {
+            switch (Base)
+            {
+            case GL_R:
+                return GL_R16F;
+            case GL_RG:
+                return GL_RG16F;
+            case GL_RGB:
+                return GL_RGB16F;
+            case GL_RGBA:
+                return GL_RGBA16F;
+            }
+        }
+        else
+        {
+            switch (Base)
+            {
+            case GL_R:
+                return GL_R8;
+            case GL_RG:
+                return GL_RG8;
+            case GL_RGB:
+                return GL_RGB8;
+            case GL_RGBA:
+                return GL_RGBA8;
+            }
+        }
+        return Base;
+    }
+}
+
 BaseTexture::BaseTexture() :
+    m_bGenerateMipmap(false),
 	m_TextureID(0),
 	m_Target(GL_INVALID_ENUM),
     m_MinFilter(GL_LINEAR_MIPMAP_LINEAR),
@@ -17,8 +86,16 @@ BaseTexture::~BaseTexture()
 	destroy();
 }
 
-/// Filename can be KTX or DDS files
 bool BaseTexture::create(const std::string& Filename)
+{
+    std::string ext = GetFileExtension(Filename);
+    if (Stricompare(ext, "DDX") || Stricompare(ext, "DDS"))
+        return createFromFileGLI(Filename);
+    return createFromFileSTB(Filename);
+} 
+
+// Filename can be KTX or DDS files
+bool BaseTexture::createFromFileGLI(const std::string& Filename)
 {
 	gli::texture Texture = gli::load(Filename);
 	if(Texture.empty())
@@ -148,6 +225,58 @@ bool BaseTexture::create(const std::string& Filename)
 	return true;
 }
 
+// Filename can be JPG, PNG, TGA, BMP, PSD, GIF, HDR, PIC files
+bool BaseTexture::createFromFileSTB(const std::string& Filename)
+{
+    stbi_set_flip_vertically_on_load(true);
+
+	GLenum Target = GL_TEXTURE_2D;
+    GLenum Type = GL_UNSIGNED_BYTE;
+    int Width = 0, Height = 0, nrComponents = 0;
+    void* Data = nullptr;
+    std::string Ext = GetFileExtension(Filename);
+    if (Stricompare(Ext, "HDR"))
+    {
+        Type = GL_FLOAT;
+        Data = stbi_loadf(Filename.c_str(), &Width, &Height, &nrComponents, 0);
+    }
+    else
+    {
+        Data = stbi_load(Filename.c_str(), &Width, &Height, &nrComponents, 0);
+    }
+    if (!Data) return false;
+
+    GLuint MaxLevel = 0;
+    if (m_bGenerateMipmap)
+        MaxLevel = GLuint(std::floor(std::log2(std::max(Width, Height))));
+
+    GLenum Format = GetComponent(nrComponents);
+    GLenum InternalFormat = GetInternalComponent(nrComponents, Type == GL_FLOAT);
+
+	GLuint TextureName = 0;
+	glGenTextures(1, &TextureName);
+	glBindTexture(Target, TextureName);
+    glTexStorage2D(Target, MaxLevel+1, InternalFormat, Width, Height);
+    glTexSubImage2D(Target, 0, 0, 0, Width, Height, Format, Type, Data);
+    if (m_bGenerateMipmap)
+        glGenerateMipmap(Target);
+
+    stbi_image_free(Data);
+
+    glTexParameteri(Target, GL_TEXTURE_WRAP_S, m_WrapS);
+    glTexParameteri(Target, GL_TEXTURE_WRAP_T, m_WrapT);
+    glTexParameteri(Target, GL_TEXTURE_WRAP_R, m_WrapR);
+    glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, m_MinFilter);
+    glTexParameteri(Target, GL_TEXTURE_MAG_FILTER, m_MagFilter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, MaxLevel);
+
+	m_Target = Target;
+	m_TextureID = TextureName;
+	glBindTexture(Target, 0);
+	return true;
+}
+
 void BaseTexture::destroy()
 {
 	if (!m_TextureID)
@@ -170,178 +299,3 @@ void BaseTexture::unbind(GLuint unit) const
 	glActiveTexture(GL_TEXTURE0 + unit);
 	glBindTexture(m_Target, 0u);
 }
-
-#if 0
-bool TextureGL::create(gli::texture &&cpuTexture) {
-    mCpuTexture = std::move(cpuTexture);
-
-    GLformat format;
-    gl::GLenum target;
-
-    std::tie(format, target) = getFormatAndTarget(mCpuTexture);
-
-    if(mCpuTexture.format() == gli::FORMAT_D32_SFLOAT_PACK32) {
-        format.internal = gl::GL_R32F;
-        format.external = gl::GL_RED;
-        format.type = gl::GL_FLOAT;
-        format.swizzleRed = gl::GL_RED;
-        format.swizzleGreen = gl::GL_RED;
-        format.swizzleBlue = gl::GL_RED;
-        format.swizzleAlpha = gl::GL_ONE;
-    }
-
-    TextureDimension dimension = getTextureDimension(mCpuTexture.target());
-    gl::GLenum minFilterGL = glConvert::textureMinFilter(mParams.minFilter);
-    gl::GLenum magFilterGL = glConvert::textureMagFilter(mParams.magFilter);
-    gl::GLenum wrapS = glConvert::textureWrapMode(mParams.wrapU);
-    gl::GLenum wrapT = glConvert::textureWrapMode(mParams.wrapV);
-    gl::GLenum wrapR = glConvert::textureWrapMode(mParams.wrapW);
-
-    if(mId != 0) {
-        gl::glDeleteTextures(1, &mId);
-    }
-
-    gl::glGenTextures(1, &mId);
-
-    gl::glBindTexture(target, mId);
-    gl::glTexParameteri(target, gl::GL_TEXTURE_MIN_FILTER, minFilterGL);
-    gl::glTexParameteri(target, gl::GL_TEXTURE_MAG_FILTER, magFilterGL);
-    gl::glTexParameteri(target, gl::GL_TEXTURE_BASE_LEVEL, (gl::GLint)mCpuTexture.base_level());
-    gl::glTexParameteri(target, gl::GL_TEXTURE_MAX_LEVEL, (gl::GLint)mCpuTexture.max_level());
-    gl::glTexParameteri(target, gl::GL_TEXTURE_WRAP_S, wrapS);
-
-    gl::glTexParameteri(target, gl::GL_TEXTURE_SWIZZLE_R, format.swizzleRed);
-    gl::glTexParameteri(target, gl::GL_TEXTURE_SWIZZLE_G, format.swizzleGreen);
-    gl::glTexParameteri(target, gl::GL_TEXTURE_SWIZZLE_B, format.swizzleBlue);
-    gl::glTexParameteri(target, gl::GL_TEXTURE_SWIZZLE_A, format.swizzleAlpha);
-
-    if(dimension == TextureDimension::Texture2D || dimension == TextureDimension::Texture3D) {
-        gl::glTexParameteri(target, gl::GL_TEXTURE_WRAP_T, wrapT);
-    }
-    if(dimension == TextureDimension::Texture3D) {
-        gl::glTexParameteri(target, gl::GL_TEXTURE_WRAP_R, wrapR);
-    }
-
-    {
-        const gli::extent3d &extent = mCpuTexture.extent();
-        gl::GLsizei faceTotal = static_cast<gl::GLsizei>(mCpuTexture.layers() * mCpuTexture.faces());
-
-        switch(mCpuTexture.target())
-        {
-        case gli::TARGET_1D:
-            gl::glTexStorage1D(target, (gl::GLint)mCpuTexture.levels(), format.internal, extent.x);
-            break;
-        case gli::TARGET_2D:
-            gl::glTexStorage2D(target, (gl::GLint)mCpuTexture.levels(), format.internal, extent.x, extent.y);
-            break;
-        case gli::TARGET_1D_ARRAY:
-        case gli::TARGET_CUBE:
-            gl::glTexStorage2D(target, (gl::GLint)mCpuTexture.levels(), format.internal, extent.x, extent.y);
-            break;
-        case gli::TARGET_2D_ARRAY:
-        case gli::TARGET_CUBE_ARRAY:
-            gl::glTexStorage3D(target, (gl::GLint)mCpuTexture.levels(), format.internal, extent.x, extent.y, faceTotal);
-            break;
-        case gli::TARGET_3D:
-            gl::glTexStorage3D(target, (gl::GLint)mCpuTexture.levels(), format.internal, extent.x, extent.y, extent.z);
-            break;
-        default:
-            Log()->error("Trying to create texture from unknown type");
-            gl::glBindTexture(target, 0);
-            return false;
-        }
-    }
-
-    size_t rowPitch = gli::block_size(mCpuTexture.format()) * mCpuTexture.extent().x;
-    bool restoreUnpackAlignment = false;
-    if(!math::isAlignedTo(rowPitch, size_t(4))) {
-        if(math::isAlignedTo(rowPitch, size_t(2))) {
-            gl::glPixelStorei(gl::GL_UNPACK_ALIGNMENT, 2);
-        } else {
-            gl::glPixelStorei(gl::GL_UNPACK_ALIGNMENT, 1);
-        }
-
-        restoreUnpackAlignment = true;
-    }
-
-    gl::GLenum originalTarget = target;
-
-    for(std::size_t layer = 0; layer < mCpuTexture.layers(); ++layer)
-    {
-        for(std::size_t face = 0; face < mCpuTexture.faces(); ++face)
-        {
-            for(std::size_t level = 0; level < mCpuTexture.levels(); ++level)
-            {
-                const gl::GLsizei layerGL = static_cast<gl::GLsizei>(layer);
-                const gli::extent3d &extent = mCpuTexture.extent(level);
-                target = (mCpuTexture.target() == gli::TARGET_CUBE) ? static_cast<gl::GLenum>(gl::GL_TEXTURE_CUBE_MAP_POSITIVE_X + (gl::GLint)face) : target;
-
-                switch(mCpuTexture.target())
-                {
-                case gli::TARGET_1D:
-                    if(gli::is_compressed(mCpuTexture.format()))
-                        gl::glCompressedTexSubImage1D(
-                            target, static_cast<gl::GLint>(level), 0, extent.x,
-                            format.internal, static_cast<gl::GLsizei>(mCpuTexture.size(level)),
-                            mCpuTexture.data(layer, face, level));
-                    else
-                        glTexSubImage1D(
-                            target, static_cast<gl::GLint>(level), 0, extent.x,
-                            format.external, format.type,
-                            mCpuTexture.data(layer, face, level));
-                    break;
-                case gli::TARGET_1D_ARRAY:
-                case gli::TARGET_2D:
-                case gli::TARGET_CUBE:
-                    if(gli::is_compressed(mCpuTexture.format()))
-                        glCompressedTexSubImage2D(
-                            target, static_cast<gl::GLint>(level),
-                            0, 0,
-                            extent.x,
-                            mCpuTexture.target() == gli::TARGET_1D_ARRAY ? layerGL : extent.y,
-                            format.internal, static_cast<gl::GLsizei>(mCpuTexture.size(level)),
-                            mCpuTexture.data(layer, face, level));
-                    else
-                        glTexSubImage2D(
-                            target, static_cast<gl::GLint>(level),
-                            0, 0,
-                            extent.x,
-                            mCpuTexture.target() == gli::TARGET_1D_ARRAY ? layerGL : extent.y,
-                            format.external, format.type,
-                            mCpuTexture.data(layer, face, level));
-                    break;
-                case gli::TARGET_2D_ARRAY:
-                case gli::TARGET_3D:
-                case gli::TARGET_CUBE_ARRAY:
-                    if(gli::is_compressed(mCpuTexture.format()))
-                        glCompressedTexSubImage3D(
-                            target, static_cast<gl::GLint>(level),
-                            0, 0, mCpuTexture.target() == gli::TARGET_3D ? 0 : layerGL,
-                            extent.x, extent.y,
-                            mCpuTexture.target() == gli::TARGET_3D ? extent.z : 1,
-                            format.internal, static_cast<gl::GLsizei>(mCpuTexture.size(level)),
-                            mCpuTexture.data(layer, face, level));
-                    else
-                        glTexSubImage3D(
-                            target, static_cast<gl::GLint>(level),
-                            0, 0, mCpuTexture.target() == gli::TARGET_3D ? 0 : (gl::GLint)(layerGL * mCpuTexture.faces() + face),
-                            extent.x, extent.y,
-                            mCpuTexture.target() == gli::TARGET_3D ? extent.z : 1,
-                            format.external, format.type,
-                            mCpuTexture.data(layer, face, level));
-                    break;
-                default:
-                    assert(0);
-                    break;
-                }
-            }
-        }
-    }
-
-    if(restoreUnpackAlignment) {
-        gl::glPixelStorei(gl::GL_UNPACK_ALIGNMENT, 4);
-    }
-
-    gl::glBindTexture(originalTarget, 0);
-}
-#endif

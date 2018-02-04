@@ -17,6 +17,7 @@ public:
 	void destroy();
 	void bind(GLuint unit) const;
 	void unbind(GLuint unit) const;
+    void setGenerateMipmap(bool bGenerate = true);
 
     bool m_bGenerateMipmap; // Support STB loader only
 	GLuint m_TextureID;

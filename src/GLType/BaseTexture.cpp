@@ -21,7 +21,7 @@ namespace {
         switch (Components)
         {
         case 1u:
-            return GL_R;
+            return GL_RED;
         case 2u:
             return GL_RG;
         case 3u:
@@ -41,7 +41,7 @@ namespace {
         {
             switch (Base)
             {
-            case GL_R:
+            case GL_RED:
                 return GL_R16F;
             case GL_RG:
                 return GL_RG16F;
@@ -55,7 +55,7 @@ namespace {
         {
             switch (Base)
             {
-            case GL_R:
+            case GL_RED:
                 return GL_R8;
             case GL_RG:
                 return GL_RG8;
@@ -70,7 +70,7 @@ namespace {
 }
 
 BaseTexture::BaseTexture() :
-    m_bGenerateMipmap(false),
+    m_bGenerateMipmap(true),
 	m_TextureID(0),
 	m_Target(GL_INVALID_ENUM),
     m_MinFilter(GL_LINEAR_MIPMAP_LINEAR),
@@ -298,4 +298,9 @@ void BaseTexture::unbind(GLuint unit) const
 {
 	glActiveTexture(GL_TEXTURE0 + unit);
 	glBindTexture(m_Target, 0u);
+}
+
+void BaseTexture::setGenerateMipmap(bool bGenerate)
+{
+    m_bGenerateMipmap = bGenerate;
 }

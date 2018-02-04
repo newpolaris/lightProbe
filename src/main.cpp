@@ -158,10 +158,10 @@ namespace
 
     ProgramShader m_programMesh;
     ProgramShader m_programSky;
-	Texture2D m_albedoTex;
-	Texture2D m_normalTex;
-	Texture2D m_metallicTex;
-	Texture2D m_roughnessTex;
+	BaseTexture m_albedoTex;
+	BaseTexture m_normalTex;
+	BaseTexture m_metallicTex;
+	BaseTexture m_roughnessTex;
     SphereMesh m_sphere( 48, 5.0f );
     FullscreenTriangleMesh m_triangle;
     CubeMesh m_cube;
@@ -355,17 +355,10 @@ namespace {
 		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
         m_currentLightProbe = LightProbe::Bolonga;
 
-		m_albedoTex.initialize();
-		m_albedoTex.load("resource/rusted_iron/albedo.png");
-
-		m_normalTex.initialize();
-		m_normalTex.load("resource/rusted_iron/normal.png");
-
-		m_metallicTex.initialize();
-		m_metallicTex.load("resource/rusted_iron/metallic.png");
-
-		m_roughnessTex.initialize();
-		m_roughnessTex.load("resource/rusted_iron/roughness.png");
+		m_albedoTex.create("resource/rusted_iron/albedo.png");
+		m_normalTex.create("resource/rusted_iron/normal.png");
+		m_metallicTex.create("resource/rusted_iron/metallic.png");
+		m_roughnessTex.create("resource/rusted_iron/roughness.png");
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -713,6 +706,7 @@ namespace {
 
 		// 2. load the HDR environment map
         BaseTexture newportTex;
+        newportTex.setGenerateMipmap(false);
         if (!newportTex.create("resource/newport_loft.hdr"))
         {
             fprintf(stderr, "fail to load texture");
@@ -957,7 +951,7 @@ namespace {
 		int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
 		const bool bPressed = (state == GLFW_PRESS);
 		const bool mouseOverGui = ImGui::MouseOverArea();
-		if (!mouseOverGui && bPressed) camera.motionHandler( xpos, ypos, false);    
+		if (!mouseOverGui && bPressed) camera.motionHandler( int(xpos), int(ypos), false);    
     }  
 
     void glfw_mouse_callback(GLFWwindow* window, int button, int action, int mods)

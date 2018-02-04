@@ -44,7 +44,6 @@ layout(location = 0) out vec4 fragColor;
 
 // UNIFORM
 uniform samplerCube uEnvmap;
-uniform samplerCube uEnvmapIrr;
 uniform float uBgType;
 uniform float uExposure;
 
@@ -56,6 +55,21 @@ vec3 toLinear(vec3 _rgb)
 vec4 toLinear(vec4 _rgba)
 {
 	return vec4(toLinear(_rgba.xyz), _rgba.w);
+}
+
+float toGamma(float _r)
+{
+	return pow(abs(_r), 1.0/2.2);
+}
+
+vec3 toGamma(vec3 _rgb)
+{
+	return pow(abs(_rgb), vec3(1.0/2.2) );
+}
+
+vec4 toGamma(vec4 _rgba)
+{
+	return vec4(toGamma(_rgba.xyz), _rgba.w);
 }
 
 vec3 toFilmic(vec3 _rgb)
@@ -93,18 +107,12 @@ void main()
 
   vec4 color;
 
-  if (uBgType == 7.0)
-  {
-	  color = toLinear(texture(uEnvmapIrr, dir));
-  }
-  else
-  {
-	  float lod = uBgType;
-	  dir = fixCubeLookup(dir, lod, 256.0);
-	  color = toLinear(textureLod(uEnvmap, dir, lod));
-  }
+  // float lod = uBgType;
+  // dir = fixCubeLookup(dir, lod, 256.0);
+  color = texture(uEnvmap, dir);
   color *= exp2(uExposure);
 
+  // Is gamma correction is included?
   fragColor = toFilmic(color);
 }
 

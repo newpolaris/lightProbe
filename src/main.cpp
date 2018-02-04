@@ -819,12 +819,14 @@ namespace {
 		glm::mat4 skyboxMtx = camera.getViewProjMatrix() * followCamera;
 		m_programSky.bind();
 		// Texture binding
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
 		m_programSky.setUniform( "uEnvmap", 0 );
-		m_programSky.setUniform( "uEnvmapIrr", 1 );
+		// m_programSky.setUniform( "uEnvmapIrr", 1 );
 		// Uniform binding
         m_programSky.setUniform( "uViewMatrix", camera.getViewMatrix() );
         m_programSky.setUniform( "uProjMatrix", camera.getProjectionMatrix() );
-		m_programSky.setUniform( "uBgType", m_settings.m_bgType );
+		// m_programSky.setUniform( "uBgType", m_settings.m_bgType );
 		m_programSky.setUniform( "uExposure", m_settings.m_exposure );
 		m_cube.draw();
 		m_programSky.unbind();
@@ -854,7 +856,7 @@ namespace {
 		// m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
 		// m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
 		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
-		m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
+		// m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
 		// m_programMesh.setUniform( "ubMetalOrSpec", float(m_settings.m_metalOrSpec) );
 		// m_programMesh.setUniform( "uRgbDiff", m_settings.m_rgbDiff );
 		// m_programMesh.setUniform( "uRgbSpec", m_settings.m_rgbSpec );
@@ -868,8 +870,8 @@ namespace {
 		}
 
 		// Texture binding
-		m_programMesh.setUniform( "uEnvmap", 0 );
-		m_programMesh.setUniform( "uEnvmapIrr", 1 );
+		// m_programMesh.setUniform( "uEnvmap", 0 );
+		// m_programMesh.setUniform( "uEnvmapIrr", 1 );
 		m_programMesh.setUniform( "uAlbedoMap", 2 );
 		m_programMesh.setUniform( "uNormalMap", 3 );
 		m_programMesh.setUniform( "uMetallicMap", 4 );

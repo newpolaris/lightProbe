@@ -326,7 +326,7 @@ void main()
   // Color.
   vec3 color = direct + indirect;
   color = color * exp2(uExposure);
-  // TODO: is gamma correction needed?
+  // Is gamma correction is included?
   fragColor.xyz = toFilmic(color);
   fragColor.w = 1.0;
 }

@@ -248,8 +248,6 @@ void main()
   // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    
   vec3 f0 = mix(vec3(0.04), inAlbedo, inMetallic);
 
-  // vec3 envFresnel = calcFresnel(f0, ndotv, 1-inRoughness);
-
   // multiply kD by the inverse metalness such that only non-metals 
   // have diffuse lighting, or a linear blend if partly metal (pure metals
   // have no diffuse light).
@@ -286,7 +284,7 @@ void main()
 	  vec3 nominator = d * g * f;
 	  // prevent divide by zero
 	  float denominator = max(0.001, 4 * ndotv * ndotl); 
-	  vec3 specular = nominator / denominator;
+	  vec3 specular = nominator / denominator * ubSpecular;
 
 	  // kS is equal to Fresnel
 	  vec3 kS = f;
@@ -296,7 +294,7 @@ void main()
 	  vec3 kD = vec3(1.0) - kS;
 
 	  // scale light by NdotL
-	  vec3 diffuse = kD * albedo / pi;
+	  vec3 diffuse = kD * albedo / pi * ubDiffuse;
 	  direct += (diffuse + specular)*radiance*ndotl;
   }
 
@@ -309,19 +307,19 @@ void main()
   // --edgeFixup warp   //!< This must be used on DirectX9. When fileted with 'warp', fixCubeLookup() should be used.
   float mip = 1.0 + 5.0*inRoughness; // Use mip levels [1..6] for radiance.
 
-  vec3 ndotv = vec3(0.0);
-  vec3 envFresnel = vec3(0.0);
-
+  float ndotv = clamp(dot(nn, vv), 0.0, 1.0);
+  vec3 envFresnel = calcFresnel(f0, ndotv, 1);
   vec3 vr = 2.0*ndotv*nn - vv; // Same as: -reflect(vv, nn);
   vec3 cubeR = normalize(vr);
   vec3 cubeN = normalize(nn);
   cubeR = fixCubeLookup(cubeR, mip, 256.0);
-
+  vec3 kS = envFresnel;
+  vec3 kD = 1.0 - envFresnel;
   vec3 radiance    = toLinear(textureLod(uEnvmap, cubeR, mip).xyz);
-  vec3 irradiance  = toLinear(texture(uEnvmapIrr, cubeN).xyz);
-  vec3 envDiffuse  = albedo     * irradiance * ubDiffuseIbl;
+  vec3 irradiance  = texture(uEnvmapIrr, cubeN).xyz;
+  vec3 envDiffuse  = albedo*kD  * irradiance * ubDiffuseIbl;
   vec3 envSpecular = envFresnel * radiance   * ubSpecularIbl;
-  vec3 indirect    = envDiffuse + envSpecular;
+  vec3 indirect    = envDiffuse;
 
   // Color.
   vec3 color = direct + indirect;

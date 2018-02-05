@@ -44,6 +44,7 @@ layout(location = 0) out vec4 fragColor;
 
 // UNIFORM
 uniform samplerCube uEnvmap;
+uniform samplerCube uEnvmapIrr;
 uniform float uBgType;
 uniform float uExposure;
 
@@ -109,7 +110,15 @@ void main()
 
   // float lod = uBgType;
   // dir = fixCubeLookup(dir, lod, 256.0);
-  color = texture(uEnvmap, dir);
+  if (uBgType == 7.0)
+  {
+    color = texture(uEnvmapIrr, dir);
+  }
+  else
+  {
+    color = texture(uEnvmap, dir);
+  }
+
   color *= exp2(uExposure);
 
   // Is gamma correction is included?

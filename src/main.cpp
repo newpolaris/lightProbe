@@ -66,7 +66,8 @@ namespace {
     int nrColumns = 7;
     float spacing = 2.5;
 
-	unsigned int envCubemap;
+	GLuint envCubemap;
+    GLuint irradianceCubemap;
 }
 
 struct LightProbe
@@ -742,8 +743,7 @@ namespace {
 		// 5. convert HDR equirectangular environment map to cubemap equivalent
 		ProgramShader equirectangularToCubemapShader;
 		equirectangularToCubemapShader.initalize();
-        // TODO: change to cubemap.Vertex
-        equirectangularToCubemapShader.addShader(GL_VERTEX_SHADER, "EquirectangularToCubemap.Vertex");
+        equirectangularToCubemapShader.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
         equirectangularToCubemapShader.addShader(GL_FRAGMENT_SHADER, "EquirectangularToCubemap.Fragment");
         equirectangularToCubemapShader.link();  
 		equirectangularToCubemapShader.bind();
@@ -763,7 +763,83 @@ namespace {
 			m_cube.draw();
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	}
+
+        // 6. create an irradiance cubemap, and re-scale capture FBO to irradiance scale.
+        uint32_t irradianceWidth = 32, irradianceHeight = 32;
+        glGenTextures(1, &irradianceCubemap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
+
+		for (unsigned int i = 0; i < 6; ++i)
+		{
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, irradianceWidth, irradianceHeight, 0, GL_RGB, GL_FLOAT, nullptr);
+		}
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, irradianceWidth, irradianceHeight);
+
+        // 7. solve diffuse integral by convolution to create an irradiance cbuemap
+        ProgramShader programIrradiance;
+        programIrradiance.initalize();
+        programIrradiance.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
+        programIrradiance.addShader(GL_FRAGMENT_SHADER, "Irradiance.Fragment");
+        programIrradiance.link();  
+		programIrradiance.bind();
+		programIrradiance.setUniform("equirectangularMap", 0);
+		programIrradiance.setUniform("projection", captureProjection);
+
+        GLuint64 startTime, stopTime;
+        unsigned int queryID[2];
+
+        // generate two queries
+        glGenQueries(2, queryID);
+
+        // issue the first query
+        // Records the time only after all previous 
+        // commands have been completed
+        glQueryCounter(queryID[0], GL_TIMESTAMP);
+
+        // call a sequence of OpenGL commands
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+        glViewport(0, 0, irradianceWidth, irradianceHeight);
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        for (int i = 0; i < 6; i++)
+        {
+			equirectangularToCubemapShader.setUniform("view", captureViews[i]);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap, 0);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			m_cube.draw();
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // issue the second query
+        // records the time when the sequence of OpenGL 
+        // commands has been fully executed
+        glQueryCounter(queryID[1], GL_TIMESTAMP);
+
+        // wait until the results are available
+        GLint stopTimerAvailable = 0;
+        while(!stopTimerAvailable) {
+            glGetQueryObjectiv(queryID[1],
+                GL_QUERY_RESULT_AVAILABLE,
+                &stopTimerAvailable);
+        }
+
+        // get query results
+        glGetQueryObjectui64v(queryID[0], GL_QUERY_RESULT, &startTime);
+        glGetQueryObjectui64v(queryID[1], GL_QUERY_RESULT, &stopTime);
+
+        printf("Time spent on the GPU: %f ms\n", (stopTime - startTime) / 1000000.0);
+    }
 
 	void prepareRender()
 	{
@@ -782,7 +858,10 @@ namespace {
 
 		// Submit view 0.
         m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
-        m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
+        // m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
+
 		glDisable( GL_DEPTH_TEST );
 		glDepthMask( GL_FALSE );  
 		glDisable( GL_CULL_FACE );  
@@ -793,12 +872,14 @@ namespace {
 		// Texture binding
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
 		m_programSky.setUniform( "uEnvmap", 0 );
-		// m_programSky.setUniform( "uEnvmapIrr", 1 );
+		m_programSky.setUniform( "uEnvmapIrr", 1 );
 		// Uniform binding
         m_programSky.setUniform( "uViewMatrix", camera.getViewMatrix() );
         m_programSky.setUniform( "uProjMatrix", camera.getProjectionMatrix() );
-		// m_programSky.setUniform( "uBgType", m_settings.m_bgType );
+		m_programSky.setUniform( "uBgType", m_settings.m_bgType );
 		m_programSky.setUniform( "uExposure", m_settings.m_exposure );
 		m_cube.draw();
 		m_programSky.unbind();
@@ -809,7 +890,9 @@ namespace {
 
 		// Sumbit view 1.
         m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
-        m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
+        // m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
 		m_albedoTex.bind(2);
 		m_normalTex.bind(3);
 		m_metallicTex.bind(4);
@@ -825,8 +908,8 @@ namespace {
 		// m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
 		// m_programMesh.setUniform( "uReflectivity", m_settings.m_reflectivity );
 		m_programMesh.setUniform( "uExposure", m_settings.m_exposure );
-		// m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
-		// m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
+		m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
+		m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
 		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
 		// m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
 		// m_programMesh.setUniform( "ubMetalOrSpec", float(m_settings.m_metalOrSpec) );
@@ -843,7 +926,7 @@ namespace {
 
 		// Texture binding
 		// m_programMesh.setUniform( "uEnvmap", 0 );
-		// m_programMesh.setUniform( "uEnvmapIrr", 1 );
+		m_programMesh.setUniform( "uEnvmapIrr", 1 );
 		m_programMesh.setUniform( "uAlbedoMap", 2 );
 		m_programMesh.setUniform( "uNormalMap", 3 );
 		m_programMesh.setUniform( "uMetallicMap", 4 );

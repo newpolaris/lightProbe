@@ -108,7 +108,7 @@ bool ProgramShader::setUniform( const std::string &name, GLint v) const
     
   if (-1 == loc)
   {
-    printf( "ProgramShader : can't find uniform \"%s\".", name.c_str());
+    printf( "ProgramShader : can't find uniform \"%s\".\n", name.c_str());
     return false;
   }
 

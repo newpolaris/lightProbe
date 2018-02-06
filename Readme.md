@@ -1,9 +1,9 @@
-Use code from [1] for irraidance code
-Use code from [2] for brdf and resource allocation code
-Use code from [3] for sequence code
-Use code from [4] for split sum and other pbr code
-Use code from [5] for some gl utility
-Use code from [6] for imgui code
+* Use code from [1] for irraidance code
+* Use code from [2] for brdf and resource allocation code
+* Use code from [3] for sequence code
+* Use code from [4] for split sum and other pbr code
+* Use code from [5] for some gl utility
+* Use code from [6] for imgui code
 
 Use resource from freepbr.com
 Use resource from artisaverb.info
@@ -19,6 +19,6 @@ OpenGL + GLFW + AssImp + ImGUI + GLI + Stbi
 6. bgfx example 18-ibl
 
 [![link text](./screenshots/pistol.jpg)](./screenshots/pistol.jpg)
-[![link text](./screenshots/orbs.png)](./screenshots/orbs.png)
+[![link text](./screenshots/orbs.jpb)](./screenshots/orbs.jpb)
 
 

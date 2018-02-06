@@ -19,6 +19,6 @@ OpenGL + GLFW + AssImp + ImGUI + GLI + Stbi
 6. bgfx example 18-ibl
 
 [![link text](./screenshots/pistol.jpg)](./screenshots/pistol.jpg)
-[![link text](./screenshots/orbs.jpb)](./screenshots/orbs.jpb)
+[![link text](./screenshots/orbs.jpg)](./screenshots/orbs.jpg)
 
 

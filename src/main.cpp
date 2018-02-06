@@ -159,8 +159,8 @@ struct Settings
 		m_lod = 0.0f;
 		m_doDiffuse = true;
 		m_doSpecular = true;
-		m_doDiffuseIbl = false;
-		m_doSpecularIbl = false;
+		m_doDiffuseIbl = true;
+		m_doSpecularIbl = true;
 		m_showLightColorWheel = true;
 		m_showDiffColorWheel = true;
 		m_showSpecColorWheel = true;
@@ -206,12 +206,13 @@ namespace
 
     ProgramShader m_programMesh;
     ProgramShader m_programSky;
+    BaseTexture m_pistolTex[4];
 	BaseTexture m_pbrTex[5][4];
     SphereMesh m_sphere( 48, 5.0f );
     FullscreenTriangleMesh m_triangle;
     CubeMesh m_cube;
 	Settings m_settings;
-	ModelPtr m_bunny;
+	ModelPtr m_pistol;
 	ModelPtr m_orb;
 
 	LightProbe m_lightProbes[LightProbe::Count];
@@ -389,9 +390,9 @@ namespace {
 		m_cube.init();
 		m_triangle.init();
 
-		m_bunny = std::make_shared<ModelAssImp>();
-		m_bunny->create();
-		m_bunny->loadFromFile( "resource/Meshes/bunny.obj" );
+		m_pistol = std::make_shared<ModelAssImp>();
+		m_pistol->create();
+		m_pistol->loadFromFile( "resource/pistol/pistol.obj" );
 
 		m_orb = std::make_shared<ModelAssImp>();
 		m_orb->create();
@@ -421,6 +422,9 @@ namespace {
                 bool bRet = m_pbrTex[k][i].create(path);
                 assert(bRet);
             }
+
+        for (int i = 0; i < 4; i++)
+            m_pistolTex[i].create("resource/pistol/" + textureTypename[i]);
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -528,7 +532,7 @@ namespace {
 
 	void finalizeApp()
 	{
-		m_bunny->destroy();
+		m_pistol->destroy();
 		m_orb->destroy();
         glswShutdown();  
         m_programMesh.destroy();
@@ -540,6 +544,8 @@ namespace {
         for (int k = 0; k < 5; k++)
             for(int i = 0; i < 4; i++) 
                 m_pbrTex[k][i].destroy();
+        for(int i = 0; i < 4; i++)
+            m_pistolTex[i].destroy();
 
         Logger::getInstance().close();
 		ImGui_ImplGlfwGL3_Shutdown();
@@ -1043,9 +1049,14 @@ namespace {
 		m_programMesh.setUniform( "uNormalMap", 1 );
 		m_programMesh.setUniform( "uMetallicMap", 2 );
 		m_programMesh.setUniform( "uRoughnessMap", 3 );
+
 		if (0 == m_settings.m_meshSelection)
 		{
-			m_bunny->render();
+            glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(1.f/10));
+            m_programMesh.setUniform("uMtxSrt", mtxS);
+            for(int i = 0; i < 4; i++)
+                m_pistolTex[i].bind(i);
+			m_pistol->render();
 		}
 		else
 		{

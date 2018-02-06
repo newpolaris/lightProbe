@@ -304,7 +304,7 @@ void main()
   vec3 irradiance  = texture(uEnvmapIrr, nn).xyz;
 
   // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL specular part.
-  const float MAX_REFLECTION_LOD = 7.0;
+  const float MAX_REFLECTION_LOD = 4.0;
   vec3 prefilteredColor = textureLod(uEnvmapPrefilter, r, inRoughness * MAX_REFLECTION_LOD).rgb;    
   vec2 brdf = texture(uEnvmapBrdfLUT, vec2(ndotv, inRoughness)).rg;
   vec3 radiance = prefilteredColor * (kS * brdf.x + brdf.y);

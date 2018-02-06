@@ -114,6 +114,7 @@ namespace {
 	GLuint envCubemap;
     GLuint irradianceCubemap;
     GLuint prefilterCubemap;
+    GLuint brdfTexture;
 }
 
 struct LightProbe
@@ -905,7 +906,7 @@ namespace {
             glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
             glViewport(0, 0, width, height);
 
-            float roughness = float(mip) / (maxMipLevels - 1);
+            float roughness = float(mip) / float(maxMipLevels - 1);
             programPrefilter.setUniform("uRoughness", roughness);
             // solve quasi monte-carlo integral for each face and a given roughness
             for (int i = 0; i < 6; i++)
@@ -917,6 +918,33 @@ namespace {
                 m_cube.draw();
             }
         }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 10. Generate a 2D LUT from the BRDF quation used.
+        glGenTextures(1, &brdfTexture);
+        glBindTexture(GL_TEXTURE_2D, brdfTexture);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG16F, 512, 512);
+        // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        // rescale capture framebuffer to brdf texture
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfTexture, 0);
+
+        ProgramShader programBrdf;
+        programBrdf.initalize();
+        programBrdf.addShader(GL_VERTEX_SHADER, "Brdf.Vertex");
+        programBrdf.addShader(GL_FRAGMENT_SHADER, "Brdf.Fragment");
+        programBrdf.link();  
+		programBrdf.bind();
+        glViewport(0, 0, 512, 512); 
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        m_triangle.draw();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 

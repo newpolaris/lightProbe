@@ -206,10 +206,7 @@ namespace
 
     ProgramShader m_programMesh;
     ProgramShader m_programSky;
-	BaseTexture m_albedoTex;
-	BaseTexture m_normalTex;
-	BaseTexture m_metallicTex;
-	BaseTexture m_roughnessTex;
+	BaseTexture m_pbrTex[5][4];
     SphereMesh m_sphere( 48, 5.0f );
     FullscreenTriangleMesh m_triangle;
     CubeMesh m_cube;
@@ -403,10 +400,27 @@ namespace {
 		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
         m_currentLightProbe = LightProbe::Bolonga;
 
-		m_albedoTex.create("resource/rusted_iron/albedo.png");
-		m_normalTex.create("resource/rusted_iron/normal.png");
-		m_metallicTex.create("resource/rusted_iron/metallic.png");
-		m_roughnessTex.create("resource/rusted_iron/roughness.png");
+        std::string type[] = {
+            "rusted_iron", 
+            "gold", 
+            "grass",
+            "plastic",
+            "wall"
+        };
+        std::string textureTypename[4] = {
+            "albedo.png",
+            "normal.png",
+            "metallic.png",
+            "roughness.png",
+        };
+
+        for (int k = 0; k < 5; k++)
+            for(int i = 0; i < 4; i++) 
+            {
+                std::string path = "resource/" + type[k] + "/" + textureTypename[i];
+                bool bRet = m_pbrTex[k][i].create(path);
+                assert(bRet);
+            }
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -522,10 +536,11 @@ namespace {
         m_sphere.destroy();
 		m_cube.destroy();
 		m_triangle.destroy();
-		m_albedoTex.destroy();
-		m_normalTex.destroy();
-		m_metallicTex.destroy();
-		m_roughnessTex.destroy();
+
+        for (int k = 0; k < 5; k++)
+            for(int i = 0; i < 4; i++) 
+                m_pbrTex[k][i].destroy();
+
         Logger::getInstance().close();
 		ImGui_ImplGlfwGL3_Shutdown();
 		glfwTerminate();
@@ -983,6 +998,7 @@ namespace {
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );
 		m_programSky.setUniform( "uEnvmapPrefilter", 2 );
+
 		// Uniform binding
         m_programSky.setUniform( "uViewMatrix", camera.getViewMatrix() );
         m_programSky.setUniform( "uProjMatrix", camera.getProjectionMatrix() );
@@ -996,17 +1012,13 @@ namespace {
 		glEnable( GL_DEPTH_TEST ); 
 
 		// Sumbit view 1.
-        glActiveTexture(GL_TEXTURE0);
+        glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
-        glActiveTexture(GL_TEXTURE1);
+        glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
-        glActiveTexture(GL_TEXTURE2);
+        glActiveTexture(GL_TEXTURE6);
         glBindTexture(GL_TEXTURE_2D, brdfTexture);
 
-		m_albedoTex.bind(3);
-		m_normalTex.bind(4);
-		m_metallicTex.bind(5);
-		m_roughnessTex.bind(6);
         m_programMesh.bind();
 		// Uniform binding
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
@@ -1024,13 +1036,13 @@ namespace {
 		}
 
 		// Texture binding
-		m_programMesh.setUniform( "uEnvmapIrr", 0 );
-		m_programMesh.setUniform( "uEnvmapPrefilter", 1 );
-		m_programMesh.setUniform( "uEnvmapBrdfLUT", 2 );
-		m_programMesh.setUniform( "uAlbedoMap", 3 );
-		m_programMesh.setUniform( "uNormalMap", 4 );
-		m_programMesh.setUniform( "uMetallicMap", 5 );
-		m_programMesh.setUniform( "uRoughnessMap", 6 );
+		m_programMesh.setUniform( "uEnvmapIrr", 4 );
+		m_programMesh.setUniform( "uEnvmapPrefilter", 5 );
+		m_programMesh.setUniform( "uEnvmapBrdfLUT", 6 );
+		m_programMesh.setUniform( "uAlbedoMap", 0 );
+		m_programMesh.setUniform( "uNormalMap", 1 );
+		m_programMesh.setUniform( "uMetallicMap", 2 );
+		m_programMesh.setUniform( "uRoughnessMap", 3 );
 		if (0 == m_settings.m_meshSelection)
 		{
 			m_bunny->render();
@@ -1038,29 +1050,22 @@ namespace {
 		else
 		{
 			// Submit orbs.
-			for (float yy = 0, yend = 5.0f; yy < yend; yy+=1.0f)
-			{
-				for (float xx = 0, xend = 5.0f; xx < xend; xx+=1.0f)
-				{
-					const float scale   =  1.2f;
-					const float spacing =  2.2f*30;
-					const float yAdj    = -0.8f;
-					glm::vec3 translate(
-							0.0f + (xx/xend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/xend),
-							yAdj/yend + (yy/yend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/yend),
-							0.0f);
-					glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale/xend));
-					glm::mat4 mtxST = glm::translate(mtxS, translate);
-					m_programMesh.setUniform( "uMtxSrt", mtxST );
-					m_sphere.draw();
-				}
-			}
+            for(float xx = 0, xend = 5.0f; xx < xend; xx += 1.0f)
+            {
+                for(int i = 0; i < 4; i++) 
+                    m_pbrTex[uint32_t(xx)][i].bind(i);
+
+                const float scale = 1.2f;
+                const float spacing = 2.2f * 30;
+                const float yAdj = -0.8f;
+                glm::vec3 translate(0.0f + (xx / xend)*spacing - (1.0f + (scale - 1.0f)*0.5f - 1.0f / xend), 0.0f, 0.0f);
+                glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale / xend));
+                glm::mat4 mtxST = glm::translate(mtxS, translate);
+                m_programMesh.setUniform("uMtxSrt", mtxST);
+                m_sphere.draw();
+            }
 		}
         m_programMesh.unbind();
-		m_albedoTex.unbind(0);
-		m_normalTex.unbind(0);
-		m_metallicTex.unbind(0);
-		m_roughnessTex.unbind(0);
 		renderHUD();
     }
 

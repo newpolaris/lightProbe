@@ -297,6 +297,7 @@ void main()
 
   float ndotv = clamp(dot(nn, vv), 0.0, 1.0);
   vec3 envFresnel = calcFresnel(f0, ndotv, 1);
+  vec3 r = reflect(-vv, nn); 
   vec3 vr = 2.0*ndotv*nn - vv; // Same as: -reflect(vv, nn);
   vec3 kS = envFresnel;
   vec3 kD = 1.0 - envFresnel;
@@ -304,7 +305,7 @@ void main()
 
   // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL specular part.
   const float MAX_REFLECTION_LOD = 7.0;
-  vec3 prefilteredColor = textureLod(uEnvmapPrefilter, -vr, inRoughness * MAX_REFLECTION_LOD).rgb;    
+  vec3 prefilteredColor = textureLod(uEnvmapPrefilter, r, inRoughness * MAX_REFLECTION_LOD).rgb;    
   vec2 brdf = texture(uEnvmapBrdfLUT, vec2(ndotv, inRoughness)).rg;
   vec3 radiance = prefilteredColor * (kS * brdf.x + brdf.y);
   vec3 envDiffuse  = albedo*kD  * irradiance * ubDiffuseIbl;

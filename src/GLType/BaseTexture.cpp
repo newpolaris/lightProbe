@@ -88,6 +88,7 @@ BaseTexture::~BaseTexture()
 
 bool BaseTexture::create(const std::string& Filename)
 {
+    if (Filename.empty()) return false;
     std::string ext = GetFileExtension(Filename);
     if (Stricompare(ext, "DDX") || Stricompare(ext, "DDS"))
         return createFromFileGLI(Filename);

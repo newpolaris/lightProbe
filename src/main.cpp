@@ -964,11 +964,6 @@ namespace {
         glPolygonMode(GL_FRONT_AND_BACK, (bWireframe)? GL_LINE : GL_FILL);
 
 		// Submit view 0.
-        m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
-        // m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
-
 		glDisable( GL_DEPTH_TEST );
 		glDepthMask( GL_FALSE );  
 		glDisable( GL_CULL_FACE );  
@@ -976,6 +971,7 @@ namespace {
 		glm::mat4 followCamera = glm::translate( glm::mat4(1.0f), camera.getPosition() );
 		glm::mat4 skyboxMtx = camera.getViewProjMatrix() * followCamera;
 		m_programSky.bind();
+
 		// Texture binding
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
@@ -983,6 +979,7 @@ namespace {
         glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
+
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );
 		m_programSky.setUniform( "uEnvmapPrefilter", 2 );
@@ -999,36 +996,26 @@ namespace {
 		glEnable( GL_DEPTH_TEST ); 
 
 		// Sumbit view 1.
-        // m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
-        // m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
-        glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
-		m_albedoTex.bind(2);
-		m_normalTex.bind(3);
-		m_metallicTex.bind(4);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		m_roughnessTex.bind(5);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, brdfTexture);
+
+		m_albedoTex.bind(3);
+		m_normalTex.bind(4);
+		m_metallicTex.bind(5);
+		m_roughnessTex.bind(6);
         m_programMesh.bind();
 		// Uniform binding
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
-		// m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
-		// m_programMesh.setUniform( "uReflectivity", m_settings.m_reflectivity );
 		m_programMesh.setUniform( "uExposure", m_settings.m_exposure );
 		m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
 		m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
 		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
-		// m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
-		// m_programMesh.setUniform( "ubMetalOrSpec", float(m_settings.m_metalOrSpec) );
-		// m_programMesh.setUniform( "uRgbDiff", m_settings.m_rgbDiff );
-		// m_programMesh.setUniform( "uRgbSpec", m_settings.m_rgbSpec );
-		// m_programMesh.setUniform( "uLightDir", m_settings.m_lightDir );
-		// m_programMesh.setUniform( "uLightCol", m_settings.m_lightCol );
+		m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
 		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );
 		for (unsigned int i = 0; i < 4; i++) {
 			std::string idx = "[" + std::to_string(i) + "]";
@@ -1037,12 +1024,13 @@ namespace {
 		}
 
 		// Texture binding
-		// m_programMesh.setUniform( "uEnvmap", 0 );
-		m_programMesh.setUniform( "uEnvmapIrr", 1 );
-		m_programMesh.setUniform( "uAlbedoMap", 2 );
-		m_programMesh.setUniform( "uNormalMap", 3 );
-		m_programMesh.setUniform( "uMetallicMap", 4 );
-		m_programMesh.setUniform( "uRoughnessMap", 5 );
+		m_programMesh.setUniform( "uEnvmapIrr", 0 );
+		m_programMesh.setUniform( "uEnvmapPrefilter", 1 );
+		m_programMesh.setUniform( "uEnvmapBrdfLUT", 2 );
+		m_programMesh.setUniform( "uAlbedoMap", 3 );
+		m_programMesh.setUniform( "uNormalMap", 4 );
+		m_programMesh.setUniform( "uMetallicMap", 5 );
+		m_programMesh.setUniform( "uRoughnessMap", 6 );
 		if (0 == m_settings.m_meshSelection)
 		{
 			m_bunny->render();
@@ -1063,16 +1051,12 @@ namespace {
 							0.0f);
 					glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale/xend));
 					glm::mat4 mtxST = glm::translate(mtxS, translate);
-					// m_programMesh.setUniform( "uGlossiness", xx*(1.0f/xend) );
-					// m_programMesh.setUniform( "uReflectivity", (yend-yy)*(1.0f/yend) );
 					m_programMesh.setUniform( "uMtxSrt", mtxST );
 					m_sphere.draw();
 				}
 			}
 		}
         m_programMesh.unbind();
-        m_lightProbes[m_currentLightProbe].m_Tex.unbind(0);
-        m_lightProbes[m_currentLightProbe].m_TexIrr.unbind(0);
 		m_albedoTex.unbind(0);
 		m_normalTex.unbind(0);
 		m_metallicTex.unbind(0);

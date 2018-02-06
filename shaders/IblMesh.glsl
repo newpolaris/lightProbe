@@ -51,8 +51,9 @@ in vec2 vTexcoords;
 layout(location = 0) out vec4 fragColor;
 
 // UNIFORM
-uniform samplerCube uEnvmap;
 uniform samplerCube uEnvmapIrr;
+uniform samplerCube uEnvmapPrefilter;
+uniform sampler2D uEnvmapBrdfLUT;
 uniform sampler2D uAlbedoMap;
 uniform sampler2D uNormalMap;
 uniform sampler2D uMetallicMap;
@@ -64,10 +65,6 @@ uniform float ubSpecular;
 uniform float ubDiffuseIbl;
 uniform float ubSpecularIbl;
 uniform float uExposure;
-// uniform vec3 uLightDir;
-// uniform vec3 uLightCol;
-// uniform vec3 uRgbDiff;
-// uniform vec3 uRgbSpec;
 uniform vec3 uLightPositions[4];
 uniform vec3 uLightColors[4];
 
@@ -298,28 +295,21 @@ void main()
 	  direct += (diffuse + specular)*radiance*ndotl;
   }
 
-  // Note: Environment textures are filtered with cmft: https://github.com/dariomanesku/cmft
-  // Params used:
-  // --excludeBase true //!< First level mip is not filtered.
-  // --mipCount 7       //!< 7 mip levels are used in total, [256x256 .. 4x4]. Lower res mip maps should be avoided.
-  // --glossScale 10    //!< Spec power scale. See: specPwr().
-  // --glossBias 2      //!< Spec power bias. See: specPwr().
-  // --edgeFixup warp   //!< This must be used on DirectX9. When fileted with 'warp', fixCubeLookup() should be used.
-  float mip = 1.0 + 5.0*inRoughness; // Use mip levels [1..6] for radiance.
-
   float ndotv = clamp(dot(nn, vv), 0.0, 1.0);
   vec3 envFresnel = calcFresnel(f0, ndotv, 1);
   vec3 vr = 2.0*ndotv*nn - vv; // Same as: -reflect(vv, nn);
-  vec3 cubeR = normalize(vr);
-  vec3 cubeN = normalize(nn);
-  cubeR = fixCubeLookup(cubeR, mip, 256.0);
   vec3 kS = envFresnel;
   vec3 kD = 1.0 - envFresnel;
-  vec3 radiance    = toLinear(textureLod(uEnvmap, cubeR, mip).xyz);
-  vec3 irradiance  = texture(uEnvmapIrr, cubeN).xyz;
+  vec3 irradiance  = texture(uEnvmapIrr, nn).xyz;
+
+  // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL specular part.
+  const float MAX_REFLECTION_LOD = 7.0;
+  vec3 prefilteredColor = textureLod(uEnvmapPrefilter, -vr, inRoughness * MAX_REFLECTION_LOD).rgb;    
+  vec2 brdf = texture(uEnvmapBrdfLUT, vec2(ndotv, inRoughness)).rg;
+  vec3 radiance = prefilteredColor * (kS * brdf.x + brdf.y);
   vec3 envDiffuse  = albedo*kD  * irradiance * ubDiffuseIbl;
-  vec3 envSpecular = envFresnel * radiance   * ubSpecularIbl;
-  vec3 indirect    = envDiffuse;
+  vec3 envSpecular = radiance   * ubSpecularIbl;
+  vec3 indirect    = envDiffuse + envSpecular;
 
   // Color.
   vec3 color = direct + indirect;

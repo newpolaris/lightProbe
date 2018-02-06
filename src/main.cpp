@@ -46,6 +46,51 @@
 #include <vector>
 #include <algorithm>
 
+class SimpleProfileGL
+{
+public:
+    SimpleProfileGL(const std::string& name): m_name(name)
+    {
+        // generate two queries
+        glGenQueries(2, m_queryID);
+
+        // issue the first query
+        // Records the time only after all previous 
+        // commands have been completed
+        glQueryCounter(m_queryID[0], GL_TIMESTAMP);
+
+    }
+    ~SimpleProfileGL()
+    {
+        // issue the second query
+        // records the time when the sequence of OpenGL 
+        // commands has been fully executed
+        glQueryCounter(m_queryID[1], GL_TIMESTAMP);
+
+        // wait until the results are available
+        GLint stopTimerAvailable = 0;
+        while(!stopTimerAvailable) {
+            glGetQueryObjectiv(m_queryID[1],
+                GL_QUERY_RESULT_AVAILABLE,
+                &stopTimerAvailable);
+        }
+
+        // get query results
+        GLuint64 startTime, stopTime;
+        glGetQueryObjectui64v(m_queryID[0], GL_QUERY_RESULT, &startTime);
+        glGetQueryObjectui64v(m_queryID[1], GL_QUERY_RESULT, &stopTime);
+
+        printf("Time spent on the GPU %s: %f ms\n", m_name.c_str(), (stopTime - startTime) / 1000000.0);
+        fflush(stdout);
+        glDeleteQueries(2, m_queryID);
+    }
+
+    std::string m_name;
+    unsigned int m_queryID[2];
+};
+
+#define PROFILEGL(name) SimpleProfileGL __profile(name)
+
 namespace {
     // lights
     // ------
@@ -68,6 +113,7 @@ namespace {
 
 	GLuint envCubemap;
     GLuint irradianceCubemap;
+    GLuint prefilterCubemap;
 }
 
 struct LightProbe
@@ -790,55 +836,84 @@ namespace {
         programIrradiance.addShader(GL_FRAGMENT_SHADER, "Irradiance.Fragment");
         programIrradiance.link();  
 		programIrradiance.bind();
-		programIrradiance.setUniform("equirectangularMap", 0);
+		programIrradiance.setUniform("environmentCube", 0);
 		programIrradiance.setUniform("projection", captureProjection);
-
-        GLuint64 startTime, stopTime;
-        unsigned int queryID[2];
-
-        // generate two queries
-        glGenQueries(2, queryID);
-
-        // issue the first query
-        // Records the time only after all previous 
-        // commands have been completed
-        glQueryCounter(queryID[0], GL_TIMESTAMP);
-
-        // call a sequence of OpenGL commands
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
 
         glViewport(0, 0, irradianceWidth, irradianceHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        for (int i = 0; i < 6; i++)
         {
-			equirectangularToCubemapShader.setUniform("view", captureViews[i]);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap, 0);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            PROFILEGL("Irradiance cubemap");
+            for (int i = 0; i < 6; i++)
+            {
+                programIrradiance.setUniform("view", captureViews[i]);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap, 0);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			m_cube.draw();
+                m_cube.draw();
+            }
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // issue the second query
-        // records the time when the sequence of OpenGL 
-        // commands has been fully executed
-        glQueryCounter(queryID[1], GL_TIMESTAMP);
-
-        // wait until the results are available
-        GLint stopTimerAvailable = 0;
-        while(!stopTimerAvailable) {
-            glGetQueryObjectiv(queryID[1],
-                GL_QUERY_RESULT_AVAILABLE,
-                &stopTimerAvailable);
+        // 8. create a prefilter cubemap and allocate mips
+        GLsizei prefilterSize = 128;
+        glGenTextures(1, &prefilterCubemap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
+        for (int i = 0; i < 6; i++)
+        {
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, prefilterSize, prefilterSize, 0, GL_RGB, GL_FLOAT, nullptr);
         }
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        // be sure to set minifcation filter to mip_linear 
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        // get query results
-        glGetQueryObjectui64v(queryID[0], GL_QUERY_RESULT, &startTime);
-        glGetQueryObjectui64v(queryID[1], GL_QUERY_RESULT, &stopTime);
+        // generate mips for the cubemap so OpenGL allocates the required memory.
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
-        printf("Time spent on the GPU: %f ms\n", (stopTime - startTime) / 1000000.0);
+        // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
+        ProgramShader programPrefilter;
+        programPrefilter.initalize();
+        programPrefilter.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
+        programPrefilter.addShader(GL_FRAGMENT_SHADER, "Prefilter.Fragment");
+        programPrefilter.link();  
+		programPrefilter.bind();
+		programPrefilter.setUniform("environmentCube", 0);
+		programPrefilter.setUniform("projection", captureProjection);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        int maxMipLevels = 5;
+        for (int mip = 0; mip < maxMipLevels; mip++)
+        {
+            PROFILEGL("Prefilter cubemap");
+            // resize render buffer to prefilter scale
+            GLsizei width = prefilterSize * std::pow(0.5, mip);
+            GLsizei height = prefilterSize * std::pow(0.5, mip);
+
+            glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+            glViewport(0, 0, width, height);
+
+            float roughness = float(mip) / (maxMipLevels - 1);
+            programPrefilter.setUniform("uRoughness", roughness);
+            // solve quasi monte-carlo integral for each face and a given roughness
+            for (int i = 0; i < 6; i++)
+            {
+                programPrefilter.setUniform("view", captureViews[i]);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterCubemap, mip);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+                m_cube.draw();
+            }
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
 	void prepareRender()
@@ -874,8 +949,11 @@ namespace {
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );
+		m_programSky.setUniform( "uEnvmapPrefilter", 2 );
 		// Uniform binding
         m_programSky.setUniform( "uViewMatrix", camera.getViewMatrix() );
         m_programSky.setUniform( "uProjMatrix", camera.getProjectionMatrix() );
@@ -889,7 +967,9 @@ namespace {
 		glEnable( GL_DEPTH_TEST ); 
 
 		// Sumbit view 1.
-        m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
+        // m_lightProbes[m_currentLightProbe].m_Tex.bind(0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
         // m_lightProbes[m_currentLightProbe].m_TexIrr.bind(1);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);

@@ -45,6 +45,7 @@ layout(location = 0) out vec4 fragColor;
 // UNIFORM
 uniform samplerCube uEnvmap;
 uniform samplerCube uEnvmapIrr;
+uniform samplerCube uEnvmapPrefilter;
 uniform float uBgType;
 uniform float uExposure;
 
@@ -114,9 +115,14 @@ void main()
   {
     color = texture(uEnvmapIrr, dir);
   }
-  else
+  else if (uBgType == 0.0)
   {
     color = texture(uEnvmap, dir);
+  }
+  else
+  {
+    // Omit 0th mip which roughness is 0.0. it is similar to the result of non filtered
+    color = textureLod(uEnvmapPrefilter, dir, uBgType);
   }
 
   color *= exp2(uExposure);

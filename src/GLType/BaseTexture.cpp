@@ -70,14 +70,17 @@ namespace {
 }
 
 BaseTexture::BaseTexture() :
-    m_bGenerateMipmap(true),
 	m_TextureID(0),
 	m_Target(GL_INVALID_ENUM),
     m_MinFilter(GL_LINEAR_MIPMAP_LINEAR),
     m_MagFilter(GL_LINEAR),
     m_WrapS(GL_CLAMP_TO_EDGE),
     m_WrapT(GL_CLAMP_TO_EDGE),
-    m_WrapR(GL_CLAMP_TO_EDGE)
+    m_WrapR(GL_CLAMP_TO_EDGE),
+	m_Width(0),
+	m_Height(0),
+	m_Depth(0),
+	m_MipCount(0)
 {
 }
 
@@ -222,6 +225,10 @@ bool BaseTexture::createFromFileGLI(const std::string& Filename)
 	}
 	m_Target = Target;
 	m_TextureID = TextureName;
+	m_MipCount = static_cast<GLint>(Texture.levels());
+	m_Width = Extent.x;
+	m_Height = Extent.y;
+	m_Depth = Texture.target() == gli::TARGET_3D ? Extent.z : FaceTotal;
 	glBindTexture(Target, 0);
 	return true;
 }
@@ -247,20 +254,14 @@ bool BaseTexture::createFromFileSTB(const std::string& Filename)
     }
     if (!Data) return false;
 
-    GLuint MaxLevel = 0;
-    if (m_bGenerateMipmap)
-        MaxLevel = GLuint(std::floor(std::log2(std::max(Width, Height))));
-
     GLenum Format = GetComponent(nrComponents);
     GLenum InternalFormat = GetInternalComponent(nrComponents, Type == GL_FLOAT);
 
 	GLuint TextureName = 0;
 	glGenTextures(1, &TextureName);
 	glBindTexture(Target, TextureName);
-    glTexStorage2D(Target, MaxLevel+1, InternalFormat, Width, Height);
-    glTexSubImage2D(Target, 0, 0, 0, Width, Height, Format, Type, Data);
-    if (m_bGenerateMipmap)
-        glGenerateMipmap(Target);
+	// To simpfy mipmap generating use TexImage rather than glTexStorage2D
+	glTexImage2D(Target, 0, InternalFormat, Width, Height, 0, Format, Type, Data);
 
     stbi_image_free(Data);
 
@@ -269,11 +270,15 @@ bool BaseTexture::createFromFileSTB(const std::string& Filename)
     glTexParameteri(Target, GL_TEXTURE_WRAP_R, m_WrapR);
     glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, m_MinFilter);
     glTexParameteri(Target, GL_TEXTURE_MAG_FILTER, m_MagFilter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, MaxLevel);
+    glTexParameteri(Target, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(Target, GL_TEXTURE_MAX_LEVEL, 0);
 
 	m_Target = Target;
 	m_TextureID = TextureName;
+	m_Width = Width;
+	m_Height = Height;
+	m_Depth = 1;
+	m_MipCount = 1;
 	glBindTexture(Target, 0);
 	return true;
 }
@@ -301,7 +306,16 @@ void BaseTexture::unbind(GLuint unit) const
 	glBindTexture(m_Target, 0u);
 }
 
-void BaseTexture::setGenerateMipmap(bool bGenerate)
+void BaseTexture::generateMipmap()
 {
-    m_bGenerateMipmap = bGenerate;
+	assert(m_Target != GL_INVALID_ENUM);
+	assert(m_TextureID != 0);
+
+	GLuint MipCount = GLuint(std::floor(std::log2(std::max(m_Width, m_Height))));
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(m_Target, m_TextureID);
+    glTexParameteri(m_Target, GL_TEXTURE_MAX_LEVEL, MipCount);
+	glGenerateMipmap(m_Target);
+	m_MipCount = MipCount;
+	glBindTexture(m_Target, 0u);
 }

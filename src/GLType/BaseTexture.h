@@ -17,9 +17,8 @@ public:
 	void destroy();
 	void bind(GLuint unit) const;
 	void unbind(GLuint unit) const;
-    void setGenerateMipmap(bool bGenerate = true);
+	void generateMipmap();
 
-    bool m_bGenerateMipmap; // Support STB loader only
 	GLuint m_TextureID;
 	GLenum m_Target;
     GLenum m_MinFilter;
@@ -27,5 +26,9 @@ public:
     GLenum m_WrapS;
     GLenum m_WrapT;
     GLenum m_WrapR;
+	GLint m_Width;
+	GLint m_Height;
+	GLint m_Depth;
+	GLint m_MipCount;
 };
 

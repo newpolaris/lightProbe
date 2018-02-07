@@ -35,7 +35,6 @@
 #include <tools/gltools.hpp>
 
 #include <GLType/ProgramShader.h>
-#include <GLType/Texture.h>
 #include <GLType/BaseTexture.h>
 #include <SkyBox.h>
 #include <Mesh.h>
@@ -421,10 +420,13 @@ namespace {
                 std::string path = "resource/" + type[k] + "/" + textureTypename[i];
                 bool bRet = m_pbrTex[k][i].create(path);
                 assert(bRet);
+				m_pbrTex[k][i].generateMipmap();
             }
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 4; i++) {
             m_pistolTex[i].create("resource/pistol/" + textureTypename[i]);
+			m_pistolTex[i].generateMipmap();
+		}
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -775,7 +777,6 @@ namespace {
 
 		// 2. load the HDR environment map
         BaseTexture newportTex;
-        newportTex.setGenerateMipmap(false);
         if (!newportTex.create("resource/newport_loft.hdr"))
         {
             fprintf(stderr, "fail to load texture");

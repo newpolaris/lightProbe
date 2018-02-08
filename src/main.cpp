@@ -739,6 +739,7 @@ namespace {
             glfwTerminate();
             exit(EXIT_FAILURE);
         }
+		newportTex.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 3. setup cubemap to render to and attach to framebuffer
 		glGenTextures(1, &envCubemap);

@@ -14,6 +14,7 @@ public:
 	void bind(GLuint unit) const;
 	void unbind(GLuint unit) const;
 	void generateMipmap();
+	void parameter(GLenum pname, GLint param);
 
 private:
     bool createFromFileGLI(const std::string& Filename);

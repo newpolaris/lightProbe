@@ -249,10 +249,7 @@ bool BaseTexture::createFromFileSTB(const std::string& Filename)
 	GLuint TextureName = 0;
 	glGenTextures(1, &TextureName);
 	glBindTexture(Target, TextureName);
-	// To simpfy mipmap generation
 	glTexImage2D(Target, 0, InternalFormat, Width, Height, 0, Format, Type, Data);
-
-	glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
     stbi_image_free(Data);
 
@@ -301,4 +298,11 @@ void BaseTexture::generateMipmap()
 	m_MipCount = GLuint(std::floor(std::log2(std::max(m_Width, m_Height))));
 }
 
+void BaseTexture::parameter(GLenum pname, GLint param)
+{
+	assert(m_Target != GL_INVALID_ENUM);
+	assert(m_TextureID != 0);
 
+	glBindTexture(m_Target, m_TextureID);
+    glTexParameteri(m_Target, pname, param);
+}

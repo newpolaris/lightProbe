@@ -119,12 +119,6 @@ bool BaseTexture::createFromFileGLI(const std::string& Filename)
 	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_B, Format.Swizzles[2]);
 	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_A, Format.Swizzles[3]);
 
-	glTexParameteri(Target, GL_TEXTURE_WRAP_S, m_WrapS);
-	glTexParameteri(Target, GL_TEXTURE_WRAP_T, m_WrapT);
-	glTexParameteri(Target, GL_TEXTURE_WRAP_R, m_WrapR);
-	glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, m_MinFilter);
-	glTexParameteri(Target, GL_TEXTURE_MAG_FILTER, m_MagFilter);
-
 	glm::tvec3<GLsizei> const Extent(Texture.extent());
 	GLsizei const FaceTotal = static_cast<GLsizei>(Texture.layers() * Texture.faces());
 
@@ -263,15 +257,10 @@ bool BaseTexture::createFromFileSTB(const std::string& Filename)
 	// To simpfy mipmap generating use TexImage rather than glTexStorage2D
 	glTexImage2D(Target, 0, InternalFormat, Width, Height, 0, Format, Type, Data);
 
+	glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
     stbi_image_free(Data);
 
-    glTexParameteri(Target, GL_TEXTURE_WRAP_S, m_WrapS);
-    glTexParameteri(Target, GL_TEXTURE_WRAP_T, m_WrapT);
-    glTexParameteri(Target, GL_TEXTURE_WRAP_R, m_WrapR);
-    glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, m_MinFilter);
-    glTexParameteri(Target, GL_TEXTURE_MAG_FILTER, m_MagFilter);
-    glTexParameteri(Target, GL_TEXTURE_BASE_LEVEL, 0);
-    glTexParameteri(Target, GL_TEXTURE_MAX_LEVEL, 0);
 
 	m_Target = Target;
 	m_TextureID = TextureName;
@@ -311,11 +300,20 @@ void BaseTexture::generateMipmap()
 	assert(m_Target != GL_INVALID_ENUM);
 	assert(m_TextureID != 0);
 
-	GLuint MipCount = GLuint(std::floor(std::log2(std::max(m_Width, m_Height))));
-	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(m_Target, m_TextureID);
-    glTexParameteri(m_Target, GL_TEXTURE_MAX_LEVEL, MipCount);
+	if (true)
+	{
+		GLuint MipCount = GLuint(std::floor(std::log2(std::max(m_Width, m_Height))));
+		glTexParameteri(m_Target, GL_TEXTURE_WRAP_S, m_WrapS);
+		glTexParameteri(m_Target, GL_TEXTURE_WRAP_T, m_WrapT);
+		glTexParameteri(m_Target, GL_TEXTURE_WRAP_R, m_WrapR);
+		glTexParameteri(m_Target, GL_TEXTURE_MIN_FILTER, m_MinFilter);
+		glTexParameteri(m_Target, GL_TEXTURE_MAG_FILTER, m_MagFilter);
+		glTexParameteri(m_Target, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(m_Target, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexParameteri(m_Target, GL_TEXTURE_MAX_LEVEL, MipCount);
+		m_MipCount = MipCount;
+	}
 	glGenerateMipmap(m_Target);
-	m_MipCount = MipCount;
 	glBindTexture(m_Target, 0u);
 }

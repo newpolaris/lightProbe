@@ -5,10 +5,6 @@
 
 class BaseTexture
 {
-private:
-    bool createFromFileGLI(const std::string& Filename);
-    bool createFromFileSTB(const std::string& Filename);
-
 public:
 	BaseTexture();
     virtual ~BaseTexture();
@@ -18,6 +14,10 @@ public:
 	void bind(GLuint unit) const;
 	void unbind(GLuint unit) const;
 	void generateMipmap();
+
+private:
+    bool createFromFileGLI(const std::string& Filename);
+    bool createFromFileSTB(const std::string& Filename);
 
 	GLuint m_TextureID;
 	GLenum m_Target;

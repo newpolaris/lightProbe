@@ -3,9 +3,9 @@
 #include "BaseTexture.h"
 
 namespace {
-    std::string GetFileExtension(const std::string& Filename)
+    std::string GetFileExtension(const std::string& filename)
     {
-        return Filename.substr(Filename.find_last_of(".") + 1);
+        return filename.substr(filename.find_last_of(".") + 1);
     }
 
     bool Stricompare(const std::string& str1, const std::string& str2) {
@@ -85,19 +85,38 @@ BaseTexture::~BaseTexture()
 	destroy();
 }
 
-bool BaseTexture::create(const std::string& Filename)
+bool BaseTexture::create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels)
 {
-    if (Filename.empty()) return false;
-    std::string ext = GetFileExtension(Filename);
+	GLuint TextureName = 0;
+	glGenTextures(1, &TextureName);
+	glBindTexture(target, TextureName);
+	glTexStorage2D(target, levels, format, width, height);
+	glBindTexture(target, 0);
+
+	m_Target = target;
+	m_TextureID = TextureName;
+	m_Format = format;
+	m_Width = width;
+	m_Height = height;
+	m_Depth = 1;
+	m_MipCount = levels;
+
+	return true;
+}
+
+bool BaseTexture::create(const std::string& filename)
+{
+    if (filename.empty()) return false;
+    std::string ext = GetFileExtension(filename);
     if (Stricompare(ext, "DDX") || Stricompare(ext, "DDS"))
-        return createFromFileGLI(Filename);
-    return createFromFileSTB(Filename);
+        return createFromFileGLI(filename);
+    return createFromFileSTB(filename);
 } 
 
-// Filename can be KTX or DDS files
-bool BaseTexture::createFromFileGLI(const std::string& Filename)
+// filename can be KTX or DDS files
+bool BaseTexture::createFromFileGLI(const std::string& filename)
 {
-	gli::texture Texture = gli::load(Filename);
+	gli::texture Texture = gli::load(filename);
 	if(Texture.empty())
 		return false;
 
@@ -224,8 +243,8 @@ bool BaseTexture::createFromFileGLI(const std::string& Filename)
 	return true;
 }
 
-// Filename can be JPG, PNG, TGA, BMP, PSD, GIF, HDR, PIC files
-bool BaseTexture::createFromFileSTB(const std::string& Filename)
+// filename can be JPG, PNG, TGA, BMP, PSD, GIF, HDR, PIC files
+bool BaseTexture::createFromFileSTB(const std::string& filename)
 {
     stbi_set_flip_vertically_on_load(true);
 
@@ -233,15 +252,15 @@ bool BaseTexture::createFromFileSTB(const std::string& Filename)
     GLenum Type = GL_UNSIGNED_BYTE;
     int Width = 0, Height = 0, nrComponents = 0;
     void* Data = nullptr;
-    std::string Ext = GetFileExtension(Filename);
+    std::string Ext = GetFileExtension(filename);
     if (Stricompare(Ext, "HDR"))
     {
         Type = GL_FLOAT;
-        Data = stbi_loadf(Filename.c_str(), &Width, &Height, &nrComponents, 0);
+        Data = stbi_loadf(filename.c_str(), &Width, &Height, &nrComponents, 0);
     }
     else
     {
-        Data = stbi_load(Filename.c_str(), &Width, &Height, &nrComponents, 0);
+        Data = stbi_load(filename.c_str(), &Width, &Height, &nrComponents, 0);
     }
     if (!Data) return false;
 

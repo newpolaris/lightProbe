@@ -66,10 +66,10 @@ namespace {
     int nrColumns = 7;
     float spacing = 2.5;
 
-	GLuint envCubemap;
-    GLuint irradianceCubemap;
-    GLuint prefilterCubemap;
-    GLuint brdfTexture;
+	BaseTexture envCubemap;
+    BaseTexture irradianceCubemap;
+    BaseTexture prefilterCubemap;
+    BaseTexture brdfTexture;
 }
 
 struct LightProbe
@@ -378,7 +378,9 @@ namespace {
             }
 
         for (int i = 0; i < 4; i++)
+		{
             m_pistolTex[i].create("resource/pistol/" + textureTypename[i]);
+		}
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -738,17 +740,8 @@ namespace {
 		newportTex.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 3. setup cubemap to render to and attach to framebuffer
-		glGenTextures(1, &envCubemap);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-		for (unsigned int i = 0; i < 6; ++i)
-		{
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
-		}
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		envCubemap.create(512, 512, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 7);
+		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 4. set up projection and view matrices for capturing data onto the 6 cubemap face directions
 		glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
@@ -779,7 +772,7 @@ namespace {
 		for (unsigned int i = 0; i < 6; ++i)
 		{
 			equirectangularToCubemapShader.setUniform("view", captureViews[i]);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap.m_TextureID, 0);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			m_cube.draw();
@@ -787,23 +780,13 @@ namespace {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // then let OpenGL generate mipmaps from first mip face (combatting visible dots artifact)
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		envCubemap.generateMipmap();
 
         // 6. create an irradiance cubemap, and re-scale capture FBO to irradiance scale.
         uint32_t irradianceWidth = 32, irradianceHeight = 32;
-        glGenTextures(1, &irradianceCubemap);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
-
-		for (unsigned int i = 0; i < 6; ++i)
-		{
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, irradianceWidth, irradianceHeight, 0, GL_RGB, GL_FLOAT, nullptr);
-		}
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		irradianceCubemap.create(irradianceWidth, irradianceHeight, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 1);
+		irradianceCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
@@ -819,8 +802,7 @@ namespace {
 		programIrradiance.setUniform("environmentCube", 0);
 		programIrradiance.setUniform("projection", captureProjection);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+		envCubemap.bind(0);
 
         glViewport(0, 0, irradianceWidth, irradianceHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
@@ -829,7 +811,7 @@ namespace {
             for (int i = 0; i < 6; i++)
             {
                 programIrradiance.setUniform("view", captureViews[i]);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap, 0);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap.m_TextureID, 0);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 m_cube.draw();
@@ -839,21 +821,8 @@ namespace {
 
         // 8. create a prefilter cubemap and allocate mips
         GLsizei prefilterSize = 128;
-        glGenTextures(1, &prefilterCubemap);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
-        for (int i = 0; i < 6; i++)
-        {
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, prefilterSize, prefilterSize, 0, GL_RGB, GL_FLOAT, nullptr);
-        }
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-        // be sure to set minifcation filter to mip_linear 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        // generate mips for the cubemap so OpenGL allocates the required memory.
-        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+		prefilterCubemap.create(prefilterSize, prefilterSize, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 7);
+		prefilterCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
         // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
         ProgramShader programPrefilter;
@@ -865,8 +834,7 @@ namespace {
 		programPrefilter.setUniform("environmentCube", 0);
 		programPrefilter.setUniform("projection", captureProjection);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+		envCubemap.bind(0);
 
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         int maxMipLevels = 5;
@@ -887,7 +855,7 @@ namespace {
             for (int i = 0; i < 6; i++)
             {
                 programPrefilter.setUniform("view", captureViews[i]);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterCubemap, mip);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterCubemap.m_TextureID, mip);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 m_cube.draw();
@@ -896,20 +864,18 @@ namespace {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // 10. Generate a 2D LUT from the BRDF quation used.
-        glGenTextures(1, &brdfTexture);
-        glBindTexture(GL_TEXTURE_2D, brdfTexture);
-        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG16F, 512, 512);
+    	brdfTexture.create(512, 512, GL_TEXTURE_2D, GL_RG16F, 1);
         // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		brdfTexture.parameter(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        brdfTexture.parameter(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        brdfTexture.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        brdfTexture.parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         // rescale capture framebuffer to brdf texture
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfTexture, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfTexture.m_TextureID, 0);
 
         ProgramShader programBrdf;
         programBrdf.initalize();
@@ -943,12 +909,10 @@ namespace {
 		m_programSky.bind();
 
 		// Texture binding
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
+		envCubemap.bind(0);
+		irradianceCubemap.bind(1);
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap.m_TextureID);
 
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );
@@ -967,12 +931,9 @@ namespace {
 		glEnable( GL_DEPTH_TEST ); 
 
 		// Sumbit view 1.
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, brdfTexture);
+		irradianceCubemap.bind(4);
+		prefilterCubemap.bind(5);
+		brdfTexture.bind(6);
 
         m_programMesh.bind();
 		// Uniform binding

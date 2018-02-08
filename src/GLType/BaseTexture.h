@@ -10,17 +10,16 @@ public:
 	BaseTexture();
     virtual ~BaseTexture();
 
-	bool create(const std::string& Filename);
+	bool create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels);
+	bool create(const std::string& filename);
 	void destroy();
 	void bind(GLuint unit) const;
 	void unbind(GLuint unit) const;
 	void generateMipmap();
 	void parameter(GLenum pname, GLint param);
 
-private:
-
-    bool createFromFileGLI(const std::string& Filename);
-    bool createFromFileSTB(const std::string& Filename);
+    bool createFromFileGLI(const std::string& filename);
+    bool createFromFileSTB(const std::string& filename);
 
 	GLuint m_TextureID;
 	GLenum m_Target;

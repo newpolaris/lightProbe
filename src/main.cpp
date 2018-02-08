@@ -45,11 +45,15 @@
 #include <vector>
 #include <algorithm>
 
+#include <chrono>
+
+using std::chrono::high_resolution_clock;
 class SimpleProfileGL
 {
 public:
     SimpleProfileGL(const std::string& name): m_name(name)
     {
+		m_queryCPU[0] = high_resolution_clock::now();
         // generate two queries
         glGenQueries(2, m_queryID);
 
@@ -61,6 +65,12 @@ public:
     }
     ~SimpleProfileGL()
     {
+		using namespace std::chrono;
+		using millisec = duration<float, std::milli>;
+
+		m_queryCPU[1] = high_resolution_clock::now();
+		auto cpuTime = duration_cast<millisec>(m_queryCPU[1] - m_queryCPU[0]);
+
         // issue the second query
         // records the time when the sequence of OpenGL 
         // commands has been fully executed
@@ -79,11 +89,14 @@ public:
         glGetQueryObjectui64v(m_queryID[0], GL_QUERY_RESULT, &startTime);
         glGetQueryObjectui64v(m_queryID[1], GL_QUERY_RESULT, &stopTime);
 
+        printf("Time spent on the CPU %s: %f ms\n", m_name.c_str(), cpuTime.count());
         printf("Time spent on the GPU %s: %f ms\n", m_name.c_str(), (stopTime - startTime) / 1000000.0);
+
         fflush(stdout);
         glDeleteQueries(2, m_queryID);
     }
 
+	high_resolution_clock::time_point m_queryCPU[2];
     std::string m_name;
     unsigned int m_queryID[2];
 };

@@ -72,6 +72,7 @@ namespace {
 BaseTexture::BaseTexture() :
 	m_TextureID(0),
 	m_Target(GL_INVALID_ENUM),
+	m_Format(GL_INVALID_ENUM),
 	m_Width(0),
 	m_Height(0),
 	m_Depth(0),
@@ -215,6 +216,7 @@ bool BaseTexture::createFromFileGLI(const std::string& Filename)
 	m_Target = Target;
 	m_TextureID = TextureName;
 	m_MipCount = static_cast<GLint>(Texture.levels());
+	m_Format = Format.Type;
 	m_Width = Extent.x;
 	m_Height = Extent.y;
 	m_Depth = Texture.target() == gli::TARGET_3D ? Extent.z : FaceTotal;
@@ -249,12 +251,16 @@ bool BaseTexture::createFromFileSTB(const std::string& Filename)
 	GLuint TextureName = 0;
 	glGenTextures(1, &TextureName);
 	glBindTexture(Target, TextureName);
-	glTexImage2D(Target, 0, InternalFormat, Width, Height, 0, Format, Type, Data);
+
+	// Use fixed storage
+    glTexStorage2D(Target, 1, InternalFormat, Width, Height);
+    glTexSubImage2D(Target, 0, 0, 0, Width, Height, Format, Type, Data);
 
     stbi_image_free(Data);
 
 	m_Target = Target;
 	m_TextureID = TextureName;
+	m_Format = Type;
 	m_Width = Width;
 	m_Height = Height;
 	m_Depth = 1;
@@ -294,8 +300,6 @@ void BaseTexture::generateMipmap()
 	glBindTexture(m_Target, m_TextureID);
 	glGenerateMipmap(m_Target);
 	glBindTexture(m_Target, 0u);
-
-	m_MipCount = GLuint(std::floor(std::log2(std::max(m_Width, m_Height))));
 }
 
 void BaseTexture::parameter(GLenum pname, GLint param)
@@ -303,6 +307,21 @@ void BaseTexture::parameter(GLenum pname, GLint param)
 	assert(m_Target != GL_INVALID_ENUM);
 	assert(m_TextureID != 0);
 
+	// Access violation in OSX
+    // glTextureParameteri(textureID, GL_TEXTURE_2D, pname, param);
 	glBindTexture(m_Target, m_TextureID);
     glTexParameteri(m_Target, pname, param);
 }
+
+#if 0
+// Is it a better idea to make a texture immutable?
+void BaseTexture::setLevels(GLint count)
+{
+	assert(count >= 0);
+	for (...)
+	glCopyImageSubData(
+		tex1, GL_TEXTURE_2D, 0, 0, 0, 0,
+		tex2, GL_TEXTURE_2D, 0, 0, 0, 0,
+		m_Width, m_Height, m_Depth);
+}
+#endif

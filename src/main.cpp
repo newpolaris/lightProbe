@@ -374,15 +374,11 @@ namespace {
             for(int i = 0; i < 4; i++) 
             {
                 std::string path = "resource/" + type[k] + "/" + textureTypename[i];
-                bool bRet = m_pbrTex[k][i].create(path);
-                assert(bRet);
-				m_pbrTex[k][i].generateMipmap();
+                m_pbrTex[k][i].create(path);
             }
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; i++)
             m_pistolTex[i].create("resource/pistol/" + textureTypename[i]);
-			m_pistolTex[i].generateMipmap();
-		}
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -717,7 +713,7 @@ namespace {
 		ImGui::End();
 	}
 
-	void convertEquirectangularToCubemap()
+	void prepareRender()
 	{
 		// 1. setup framebuffer
 		unsigned int captureFBO;
@@ -925,11 +921,6 @@ namespace {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_triangle.draw();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-
-	void prepareRender()
-	{
-		convertEquirectangularToCubemap();
 	}
 
     void render()

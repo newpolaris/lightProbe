@@ -326,21 +326,5 @@ void BaseTexture::parameter(GLenum pname, GLint param)
 	assert(m_Target != GL_INVALID_ENUM);
 	assert(m_TextureID != 0);
 
-	// Access violation in OSX
-    // glTextureParameteri(textureID, GL_TEXTURE_2D, pname, param);
-	glBindTexture(m_Target, m_TextureID);
-    glTexParameteri(m_Target, pname, param);
+    glTextureParameteri(m_TextureID, pname, param);
 }
-
-#if 0
-// Is it a better idea to make a texture immutable?
-void BaseTexture::setLevels(GLint count)
-{
-	assert(count >= 0);
-	for (...)
-	glCopyImageSubData(
-		tex1, GL_TEXTURE_2D, 0, 0, 0, 0,
-		tex2, GL_TEXTURE_2D, 0, 0, 0, 0,
-		m_Width, m_Height, m_Depth);
-}
-#endif

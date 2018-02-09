@@ -831,6 +831,11 @@ namespace {
 		prefilterCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
         // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
+		// glCopyImageSubData(
+		//		envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 2, 0, 0, 0,
+		//		prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0, 
+		//		128, 128, 6);
+
         ProgramShader programPrefilter;
         programPrefilter.initalize();
         programPrefilter.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
@@ -840,15 +845,10 @@ namespace {
 		programPrefilter.setUniform("environmentCube", 0);
 		programPrefilter.setUniform("projection", captureProjection);
 
-		glCopyImageSubData(
-				envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 2, 0, 0, 0,
-				prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0, 
-				128, 128, 6);
-
 		envCubemap.bind(0);
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         int maxMipLevels = 5;
-        for (int mip = 1; mip < maxMipLevels; mip++)
+        for (int mip = 0; mip < maxMipLevels; mip++)
         {
             PROFILEGL("Prefilter cubemap");
             // resize render buffer to prefilter scale

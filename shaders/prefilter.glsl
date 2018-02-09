@@ -71,7 +71,7 @@ void main()
 	vec3 R = N;
 	vec3 V = R;
 
-	uint sampleCount = 1024u;
+	uint sampleCount = 32u;
 	vec3 prefilterColor = vec3(0.0);
 	float totalWeight = 0.0;
 	for (uint s = 0u; s < sampleCount; s++)
@@ -89,9 +89,13 @@ void main()
 			float hdotv = max(dot(H, V), 0.0);
 			float pdf = D * ndoth / (4.0 * hdotv) + 0.0001;
 			float resolution = 512.0; // resolution of source cubemap (per face)
-			float saTexel = 4.0 * pi / (6.0 * resolution * resolution);
-			float saSample = 1.0 / (float(sampleCount) * pdf + 0.0001);
-			float mipLevel = uRoughness == 0.0 ? 0.0 : 0.5 * log2(saSample / saTexel);
+			// Solid angle covered by 1 pixel with 6 faces that are resolution x resolution
+			float omegaP = 4.0 * pi / (6.0 * resolution * resolution);
+			// Solid angle represented by this sample
+			float omegaS = 1.0 / (float(sampleCount) * pdf + 0.0001);
+			// Original paper suggest biasing the mip to improve the results	
+			float mipBias = 1.0;
+			float mipLevel = max(0.5 * log2(omegaS / omegaP) + mipBias, 0.0);
 			prefilterColor += textureLod(environmentCube, L, mipLevel).rgb * ndotl;
 			totalWeight += ndotl;
 		}

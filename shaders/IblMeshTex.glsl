@@ -54,18 +54,17 @@ layout(location = 0) out vec4 fragColor;
 uniform samplerCube uEnvmapIrr;
 uniform samplerCube uEnvmapPrefilter;
 uniform sampler2D uEnvmapBrdfLUT;
+uniform sampler2D uAlbedoMap;
+uniform sampler2D uNormalMap;
+uniform sampler2D uMetallicMap;
+uniform sampler2D uRoughnessMap;
 
 uniform float ubMetalOrSpec;
 uniform float ubDiffuse;
 uniform float ubSpecular;
 uniform float ubDiffuseIbl;
 uniform float ubSpecularIbl;
-uniform float uGlossiness;
-uniform float uReflectivity;
 uniform float uExposure;
-uniform vec3 uLightDir;
-uniform vec3 uLightCol;
-uniform vec3 uRgbDiff;
 uniform vec3 uLightPositions[4];
 uniform vec3 uLightColors[4];
 
@@ -238,9 +237,9 @@ mat3 calcTbn(vec3 _normal, vec3 _worldPos, vec2 _texCoords)
 void main()
 {  
   // Material params. uMetallicMap
-  vec3  inAlbedo = uRgbDiff;
-  float inMetallic = uReflectivity;
-  float inRoughness = uGlossiness;
+  vec3  inAlbedo = toLinear(texture(uAlbedoMap, vTexcoords).rgb);
+  float inMetallic = texture(uMetallicMap, vTexcoords).r;
+  float inRoughness = texture(uRoughnessMap, vTexcoords).r;
 
   // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
   // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    
@@ -254,6 +253,10 @@ void main()
   // Input.
   vec3 nn = normalize(vNormalWS);
   vec3 vv = normalize(vViewDirWS);
+
+  mat3 tbn = calcTbn(nn, vWorldPosWS, vTexcoords);
+  vec3 tangentNormal = texture(uNormalMap, vTexcoords).xyz * 2.0 - 1.0;
+  nn = normalize(tbn * tangentNormal);
 
   // reflectance equation
   vec3 direct = vec3(0.0);

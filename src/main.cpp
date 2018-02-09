@@ -108,7 +108,7 @@ struct Settings
 		m_bgType = 3.0f;
 		m_radianceSlider = 2.0f;
 		m_reflectivity = 0.85f;
-		m_rgbDiff = glm::vec3(0.5f, 0.f, 0.f);
+		m_rgbDiff = glm::vec3(0.2f, 0.2f, 0.2f);
 		m_rgbSpec = glm::vec3(1.f);
 		m_lod = 0.0f;
 		m_doDiffuse = true;
@@ -159,6 +159,7 @@ namespace
 	GLFWwindow* window = nullptr;  
 
     ProgramShader m_programMesh;
+    ProgramShader m_programMeshTex;
     ProgramShader m_programSky;
     BaseTexture m_pistolTex[4];
 	BaseTexture m_pbrTex[5][4];
@@ -191,6 +192,8 @@ namespace
 	void prepareRender();
     void render();
 	void renderHUD();
+    void renderTestCubeSample();
+    void renderTexturedCube();
 	void update();
 	void updateHUD();
 
@@ -347,13 +350,18 @@ namespace {
 
 		m_pistol = std::make_shared<ModelAssImp>();
 		m_pistol->create();
+    #if !_DEBUG
 		m_pistol->loadFromFile( "resource/pistol/pistol.obj" );
+    #endif
 
 		m_orb = std::make_shared<ModelAssImp>();
 		m_orb->create();
 
+    #if !_DEBUG
 		m_lightProbes[LightProbe::Bolonga].load("bolonga");
 		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
+    #endif
+
         m_currentLightProbe = LightProbe::Bolonga;
 
         std::string type[] = {
@@ -381,6 +389,11 @@ namespace {
 		{
             m_pistolTex[i].create("resource/pistol/" + textureTypename[i]);
 		}
+
+        m_programMeshTex.initalize();
+        m_programMeshTex.addShader(GL_VERTEX_SHADER, "IblMeshTex.Vertex");
+        m_programMeshTex.addShader(GL_FRAGMENT_SHADER, "IblMeshTex.Fragment");
+        m_programMeshTex.link();  
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -495,6 +508,7 @@ namespace {
 		m_orb->destroy();
         glswShutdown();  
         m_programMesh.destroy();
+        m_programMeshTex.destroy();
         m_programSky.destroy();
         m_sphere.destroy();
 		m_cube.destroy();
@@ -847,28 +861,30 @@ namespace {
 
 		envCubemap.bind(0);
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        int maxMipLevels = 5;
-        for (int mip = 0; mip < maxMipLevels; mip++)
         {
+            int maxMipLevels = 5;
             PROFILEGL("Prefilter cubemap");
-            // resize render buffer to prefilter scale
-            GLsizei width = prefilterSize * std::pow(0.5, mip);
-            GLsizei height = prefilterSize * std::pow(0.5, mip);
-
-            glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
-            glViewport(0, 0, width, height);
-
-            float roughness = float(mip) / float(maxMipLevels - 1);
-            programPrefilter.setUniform("uRoughness", roughness);
-            // solve quasi monte-carlo integral for each face and a given roughness
-            for (int i = 0; i < 6; i++)
+            for (int mip = 0; mip < maxMipLevels; mip++)
             {
-                programPrefilter.setUniform("view", captureViews[i]);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterCubemap.m_TextureID, mip);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                // resize render buffer to prefilter scale
+                GLsizei width = prefilterSize * std::pow(0.5, mip);
+                GLsizei height = prefilterSize * std::pow(0.5, mip);
 
-                m_cube.draw();
+                glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+                glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+                glViewport(0, 0, width, height);
+
+                float roughness = float(mip) / float(maxMipLevels - 1);
+                programPrefilter.setUniform("uRoughness", roughness);
+                // solve quasi monte-carlo integral for each face and a given roughness
+                for (int i = 0; i < 6; i++)
+                {
+                    programPrefilter.setUniform("view", captureViews[i]);
+                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterCubemap.m_TextureID, mip);
+                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+                    m_cube.draw();
+                }
             }
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -940,40 +956,56 @@ namespace {
 		glDepthMask( GL_TRUE );
 		glEnable( GL_DEPTH_TEST ); 
 
-		// Sumbit view 1.
+    #if !_DEBUG
+        renderTexturedCube();
+    #else
+        renderTestCubeSample();
+    #endif
+		renderHUD();
+    }
+
+	void renderHUD()
+	{
+		// restore some state
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        ImGui::Render();
+	}
+
+    void renderTexturedCube()
+    {
 		irradianceCubemap.bind(4);
 		prefilterCubemap.bind(5);
 		brdfTexture.bind(6);
 
-        m_programMesh.bind();
+        m_programMeshTex.bind();
 		// Uniform binding
-        m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
-		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
-		m_programMesh.setUniform( "uExposure", m_settings.m_exposure );
-		m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
-		m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
-		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
-		m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
-		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );
+        m_programMeshTex.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
+		m_programMeshTex.setUniform( "uEyePosWS", camera.getPosition());
+		m_programMeshTex.setUniform( "uExposure", m_settings.m_exposure );
+		m_programMeshTex.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
+		m_programMeshTex.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
+		m_programMeshTex.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
+		m_programMeshTex.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
+		m_programMeshTex.setUniform( "uMtxSrt", glm::mat4(1) );
 		for (unsigned int i = 0; i < 4; i++) {
 			std::string idx = "[" + std::to_string(i) + "]";
-			m_programMesh.setUniform("uLightPositions" + idx, lightPositions[i]);
-			m_programMesh.setUniform("uLightColors" + idx, lightColors[i]);
+			m_programMeshTex.setUniform("uLightPositions" + idx, lightPositions[i]);
+			m_programMeshTex.setUniform("uLightColors" + idx, lightColors[i]);
 		}
 
 		// Texture binding
-		m_programMesh.setUniform( "uEnvmapIrr", 4 );
-		m_programMesh.setUniform( "uEnvmapPrefilter", 5 );
-		m_programMesh.setUniform( "uEnvmapBrdfLUT", 6 );
-		m_programMesh.setUniform( "uAlbedoMap", 0 );
-		m_programMesh.setUniform( "uNormalMap", 1 );
-		m_programMesh.setUniform( "uMetallicMap", 2 );
-		m_programMesh.setUniform( "uRoughnessMap", 3 );
+		m_programMeshTex.setUniform( "uEnvmapIrr", 4 );
+		m_programMeshTex.setUniform( "uEnvmapPrefilter", 5 );
+		m_programMeshTex.setUniform( "uEnvmapBrdfLUT", 6 );
+		m_programMeshTex.setUniform( "uAlbedoMap", 0 );
+		m_programMeshTex.setUniform( "uNormalMap", 1 );
+		m_programMeshTex.setUniform( "uMetallicMap", 2 );
+		m_programMeshTex.setUniform( "uRoughnessMap", 3 );
 
 		if (0 == m_settings.m_meshSelection)
 		{
             glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(1.f/10));
-            m_programMesh.setUniform("uMtxSrt", mtxS);
+            m_programMeshTex.setUniform("uMtxSrt", mtxS);
             for(int i = 0; i < 4; i++)
                 m_pistolTex[i].bind(i);
 			m_pistol->render();
@@ -992,20 +1024,62 @@ namespace {
                 glm::vec3 translate(0.0f + (xx / xend)*spacing - (1.0f + (scale - 1.0f)*0.5f - 1.0f / xend), 0.0f, 0.0f);
                 glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale / xend));
                 glm::mat4 mtxST = glm::translate(mtxS, translate);
-                m_programMesh.setUniform("uMtxSrt", mtxST);
+                m_programMeshTex.setUniform("uMtxSrt", mtxST);
                 m_sphere.draw();
             }
 		}
-        m_programMesh.unbind();
-		renderHUD();
+        m_programMeshTex.unbind();
     }
 
-	void renderHUD()
-	{
-		// restore some state
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        ImGui::Render();
-	}
+    void renderTestCubeSample()
+    {	
+		glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );  
+		irradianceCubemap.bind(4);
+		prefilterCubemap.bind(5);
+		brdfTexture.bind(6);
+
+        m_programMesh.bind();
+		// Uniform binding
+        m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
+		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
+		m_programMesh.setUniform( "uGlossiness", m_settings.m_glossiness );
+		m_programMesh.setUniform( "uReflectivity", m_settings.m_reflectivity );
+		m_programMesh.setUniform( "uExposure", m_settings.m_exposure );
+		m_programMesh.setUniform( "ubDiffuse", float(m_settings.m_doDiffuse) );
+		m_programMesh.setUniform( "ubSpecular", float(m_settings.m_doSpecular) );
+		m_programMesh.setUniform( "ubDiffuseIbl", float(m_settings.m_doDiffuseIbl) );
+		m_programMesh.setUniform( "ubSpecularIbl", float(m_settings.m_doSpecularIbl) );
+		m_programMesh.setUniform( "uRgbDiff", m_settings.m_rgbDiff );
+		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );
+
+		// Texture binding
+		m_programMesh.setUniform( "uEnvmapIrr", 4 );
+		m_programMesh.setUniform( "uEnvmapPrefilter", 5 );
+		m_programMesh.setUniform( "uEnvmapBrdfLUT", 6 );
+
+        // Submit orbs.
+        for (float yy = 0, yend = 5.0f; yy < yend; yy+=1.0f)
+        {
+            for (float xx = 0, xend = 5.0f; xx < xend; xx+=1.0f)
+            {
+                const float scale   =  1.2f;
+                const float spacing =  2.2f*30;
+                const float yAdj    = -0.8f;
+                glm::vec3 translate(
+                        0.0f + (xx/xend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/xend),
+                        yAdj/yend + (yy/yend)*spacing - (1.0f + (scale-1.0f)*0.5f - 1.0f/yend),
+                        0.0f);
+                glm::mat4 mtxS = glm::scale(glm::mat4(1), glm::vec3(scale/xend));
+                glm::mat4 mtxST = glm::translate(mtxS, translate);
+                m_programMesh.setUniform( "uGlossiness", xx*(1.0f/xend) );
+                m_programMesh.setUniform( "uReflectivity", (yend-yy)*(1.0f/yend) );
+                m_programMesh.setUniform( "uMtxSrt", mtxST );
+                m_sphere.draw();
+            }
+        }
+        m_programMesh.unbind();
+		glDisable( GL_TEXTURE_CUBE_MAP_SEAMLESS );  
+    }
 
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 
 	{

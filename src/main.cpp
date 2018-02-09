@@ -4,7 +4,6 @@
 
 // OpenGL & GLEW (GL Extension Wrangler)
 #include <GL/glew.h>
-
 // GLFW
 #include <glfw3.h>
 
@@ -195,6 +194,7 @@ namespace
 	void update();
 	void updateHUD();
 
+	void glfw_error_callback(int error, const char* description);
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
     void glfw_reshape_callback(GLFWwindow* window, int width, int height);
     void glfw_mouse_callback(GLFWwindow* window, int button, int action, int mods);
@@ -455,22 +455,25 @@ namespace {
 
 	void initWindow(int argc, char** argv)
 	{
+		glfwSetErrorCallback(glfw_error_callback);
+
 		// Initialise GLFW
 		if( !glfwInit() )
 		{
 			fprintf( stderr, "Failed to initialize GLFW\n" );
 			exit( EXIT_FAILURE );
 		}
-		glfwWindowHint(GLFW_SAMPLES, 4);
-		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        
+        glfwWindowHint(GLFW_SAMPLES, 4);
+        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
 		window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_NAME, NULL, NULL );
 		if ( window == NULL ) {
-			fprintf( stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n" );
+			fprintf( stderr, "Failed to open GLFW window\n" );
 			glfwTerminate();
 			exit( EXIT_FAILURE );
 		}
@@ -529,7 +532,10 @@ namespace {
 	}
 
     // GLFW Callbacks_________________________________________________  
-
+	void glfw_error_callback(int error, const char* description)
+	{
+		fprintf(stderr, "Error: %s\n", description);
+	}
 
     void glfw_reshape_callback(GLFWwindow* window, int width, int height)
     {
@@ -838,7 +844,31 @@ namespace {
 
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         int maxMipLevels = 5;
-        for (int mip = 0; mip < maxMipLevels; mip++)
+
+#if 1
+		for (int i = 0; i < 6; i++)
+		{
+            glBindRenderbuffer(GL_READ_FRAMEBUFFER, captureRBO);
+			glFramebufferTexture2D(
+					GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+					GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+					envCubemap.m_TextureID, 3);
+			glFramebufferTexture2D(
+					GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT1,
+					GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+					prefilterCubemap.m_TextureID, 0);
+
+			glBlitFramebuffer(0, 0, 128, 128, 0, 0, 128, 128, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+			// glCopyTexSubImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 3, 0, 0, 0, 0, 128, 128);
+		}
+#else
+		glCopyImageSubData(
+				envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 2, 0, 0, 0,
+				prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0, 
+				128, 128, 0);
+#endif
+
+        for (int mip = 1; mip < maxMipLevels; mip++)
         {
             PROFILEGL("Prefilter cubemap");
             // resize render buffer to prefilter scale

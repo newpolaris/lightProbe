@@ -840,34 +840,14 @@ namespace {
 		programPrefilter.setUniform("environmentCube", 0);
 		programPrefilter.setUniform("projection", captureProjection);
 
-		envCubemap.bind(0);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        int maxMipLevels = 5;
-
-#if 1
-		for (int i = 0; i < 6; i++)
-		{
-            glBindRenderbuffer(GL_READ_FRAMEBUFFER, captureRBO);
-			glFramebufferTexture2D(
-					GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-					GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-					envCubemap.m_TextureID, 3);
-			glFramebufferTexture2D(
-					GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT1,
-					GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-					prefilterCubemap.m_TextureID, 0);
-
-			glBlitFramebuffer(0, 0, 128, 128, 0, 0, 128, 128, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-			// glCopyTexSubImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 3, 0, 0, 0, 0, 128, 128);
-		}
-#else
 		glCopyImageSubData(
 				envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 2, 0, 0, 0,
 				prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0, 
-				128, 128, 0);
-#endif
+				128, 128, 6);
 
+		envCubemap.bind(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+        int maxMipLevels = 5;
         for (int mip = 1; mip < maxMipLevels; mip++)
         {
             PROFILEGL("Prefilter cubemap");

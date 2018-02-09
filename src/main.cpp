@@ -4,7 +4,6 @@
 
 // OpenGL & GLEW (GL Extension Wrangler)
 #include <GL/glew.h>
-
 // GLFW
 #include <glfw3.h>
 
@@ -28,6 +27,7 @@
 #include <imgui/imgui_impl_glfw_gl3.h>
 
 #include <tools/stb_image.h>
+#include <tools/SimpleProfile.h>
 
 #include <tools/TCamera.hpp>
 #include <tools/Timer.hpp>
@@ -35,7 +35,6 @@
 #include <tools/gltools.hpp>
 
 #include <GLType/ProgramShader.h>
-#include <GLType/Texture.h>
 #include <GLType/BaseTexture.h>
 #include <SkyBox.h>
 #include <Mesh.h>
@@ -45,51 +44,6 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
-
-class SimpleProfileGL
-{
-public:
-    SimpleProfileGL(const std::string& name): m_name(name)
-    {
-        // generate two queries
-        glGenQueries(2, m_queryID);
-
-        // issue the first query
-        // Records the time only after all previous 
-        // commands have been completed
-        glQueryCounter(m_queryID[0], GL_TIMESTAMP);
-
-    }
-    ~SimpleProfileGL()
-    {
-        // issue the second query
-        // records the time when the sequence of OpenGL 
-        // commands has been fully executed
-        glQueryCounter(m_queryID[1], GL_TIMESTAMP);
-
-        // wait until the results are available
-        GLint stopTimerAvailable = 0;
-        while(!stopTimerAvailable) {
-            glGetQueryObjectiv(m_queryID[1],
-                GL_QUERY_RESULT_AVAILABLE,
-                &stopTimerAvailable);
-        }
-
-        // get query results
-        GLuint64 startTime, stopTime;
-        glGetQueryObjectui64v(m_queryID[0], GL_QUERY_RESULT, &startTime);
-        glGetQueryObjectui64v(m_queryID[1], GL_QUERY_RESULT, &stopTime);
-
-        printf("Time spent on the GPU %s: %f ms\n", m_name.c_str(), (stopTime - startTime) / 1000000.0);
-        fflush(stdout);
-        glDeleteQueries(2, m_queryID);
-    }
-
-    std::string m_name;
-    unsigned int m_queryID[2];
-};
-
-#define PROFILEGL(name) SimpleProfileGL __profile(name)
 
 namespace {
     // lights
@@ -111,10 +65,10 @@ namespace {
     int nrColumns = 7;
     float spacing = 2.5;
 
-	GLuint envCubemap;
-    GLuint irradianceCubemap;
-    GLuint prefilterCubemap;
-    GLuint brdfTexture;
+	BaseTexture envCubemap;
+    BaseTexture irradianceCubemap;
+    BaseTexture prefilterCubemap;
+    BaseTexture brdfTexture;
 }
 
 struct LightProbe
@@ -240,6 +194,7 @@ namespace
 	void update();
 	void updateHUD();
 
+	void glfw_error_callback(int error, const char* description);
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
     void glfw_reshape_callback(GLFWwindow* window, int width, int height);
     void glfw_mouse_callback(GLFWwindow* window, int button, int action, int mods);
@@ -419,12 +374,13 @@ namespace {
             for(int i = 0; i < 4; i++) 
             {
                 std::string path = "resource/" + type[k] + "/" + textureTypename[i];
-                bool bRet = m_pbrTex[k][i].create(path);
-                assert(bRet);
+                m_pbrTex[k][i].create(path);
             }
 
         for (int i = 0; i < 4; i++)
+		{
             m_pistolTex[i].create("resource/pistol/" + textureTypename[i]);
+		}
 
         m_programMesh.initalize();
         m_programMesh.addShader(GL_VERTEX_SHADER, "IblMesh.Vertex");
@@ -499,22 +455,25 @@ namespace {
 
 	void initWindow(int argc, char** argv)
 	{
+		glfwSetErrorCallback(glfw_error_callback);
+
 		// Initialise GLFW
 		if( !glfwInit() )
 		{
 			fprintf( stderr, "Failed to initialize GLFW\n" );
 			exit( EXIT_FAILURE );
 		}
-		glfwWindowHint(GLFW_SAMPLES, 4);
-		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        
+        glfwWindowHint(GLFW_SAMPLES, 4);
+        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
 		window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_NAME, NULL, NULL );
 		if ( window == NULL ) {
-			fprintf( stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n" );
+			fprintf( stderr, "Failed to open GLFW window\n" );
 			glfwTerminate();
 			exit( EXIT_FAILURE );
 		}
@@ -573,7 +532,10 @@ namespace {
 	}
 
     // GLFW Callbacks_________________________________________________  
-
+	void glfw_error_callback(int error, const char* description)
+	{
+		fprintf(stderr, "Error: %s\n", description);
+	}
 
     void glfw_reshape_callback(GLFWwindow* window, int width, int height)
     {
@@ -759,7 +721,7 @@ namespace {
 		ImGui::End();
 	}
 
-	void convertEquirectangularToCubemap()
+	void prepareRender()
 	{
 		// 1. setup framebuffer
 		unsigned int captureFBO;
@@ -775,26 +737,17 @@ namespace {
 
 		// 2. load the HDR environment map
         BaseTexture newportTex;
-        newportTex.setGenerateMipmap(false);
         if (!newportTex.create("resource/newport_loft.hdr"))
         {
             fprintf(stderr, "fail to load texture");
             glfwTerminate();
             exit(EXIT_FAILURE);
         }
+		newportTex.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 3. setup cubemap to render to and attach to framebuffer
-		glGenTextures(1, &envCubemap);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-		for (unsigned int i = 0; i < 6; ++i)
-		{
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
-		}
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		envCubemap.create(512, 512, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 7);
+		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 4. set up projection and view matrices for capturing data onto the 6 cubemap face directions
 		glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
@@ -825,7 +778,7 @@ namespace {
 		for (unsigned int i = 0; i < 6; ++i)
 		{
 			equirectangularToCubemapShader.setUniform("view", captureViews[i]);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap.m_TextureID, 0);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			m_cube.draw();
@@ -833,23 +786,13 @@ namespace {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // then let OpenGL generate mipmaps from first mip face (combatting visible dots artifact)
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		envCubemap.generateMipmap();
 
         // 6. create an irradiance cubemap, and re-scale capture FBO to irradiance scale.
         uint32_t irradianceWidth = 32, irradianceHeight = 32;
-        glGenTextures(1, &irradianceCubemap);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
-
-		for (unsigned int i = 0; i < 6; ++i)
-		{
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, irradianceWidth, irradianceHeight, 0, GL_RGB, GL_FLOAT, nullptr);
-		}
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		irradianceCubemap.create(irradianceWidth, irradianceHeight, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 1);
+		irradianceCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
@@ -865,8 +808,7 @@ namespace {
 		programIrradiance.setUniform("environmentCube", 0);
 		programIrradiance.setUniform("projection", captureProjection);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+		envCubemap.bind(0);
 
         glViewport(0, 0, irradianceWidth, irradianceHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
@@ -875,7 +817,7 @@ namespace {
             for (int i = 0; i < 6; i++)
             {
                 programIrradiance.setUniform("view", captureViews[i]);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap, 0);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap.m_TextureID, 0);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 m_cube.draw();
@@ -885,21 +827,8 @@ namespace {
 
         // 8. create a prefilter cubemap and allocate mips
         GLsizei prefilterSize = 128;
-        glGenTextures(1, &prefilterCubemap);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
-        for (int i = 0; i < 6; i++)
-        {
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, prefilterSize, prefilterSize, 0, GL_RGB, GL_FLOAT, nullptr);
-        }
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-        // be sure to set minifcation filter to mip_linear 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        // generate mips for the cubemap so OpenGL allocates the required memory.
-        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+		prefilterCubemap.create(prefilterSize, prefilterSize, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 7);
+		prefilterCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
         // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
         ProgramShader programPrefilter;
@@ -911,12 +840,35 @@ namespace {
 		programPrefilter.setUniform("environmentCube", 0);
 		programPrefilter.setUniform("projection", captureProjection);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+		envCubemap.bind(0);
 
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         int maxMipLevels = 5;
-        for (int mip = 0; mip < maxMipLevels; mip++)
+
+#if 1
+		for (int i = 0; i < 6; i++)
+		{
+            glBindRenderbuffer(GL_READ_FRAMEBUFFER, captureRBO);
+			glFramebufferTexture2D(
+					GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+					GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+					envCubemap.m_TextureID, 3);
+			glFramebufferTexture2D(
+					GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT1,
+					GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+					prefilterCubemap.m_TextureID, 0);
+
+			glBlitFramebuffer(0, 0, 128, 128, 0, 0, 128, 128, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+			// glCopyTexSubImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 3, 0, 0, 0, 0, 128, 128);
+		}
+#else
+		glCopyImageSubData(
+				envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 2, 0, 0, 0,
+				prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0, 
+				128, 128, 0);
+#endif
+
+        for (int mip = 1; mip < maxMipLevels; mip++)
         {
             PROFILEGL("Prefilter cubemap");
             // resize render buffer to prefilter scale
@@ -933,7 +885,7 @@ namespace {
             for (int i = 0; i < 6; i++)
             {
                 programPrefilter.setUniform("view", captureViews[i]);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterCubemap, mip);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterCubemap.m_TextureID, mip);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 m_cube.draw();
@@ -942,20 +894,18 @@ namespace {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // 10. Generate a 2D LUT from the BRDF quation used.
-        glGenTextures(1, &brdfTexture);
-        glBindTexture(GL_TEXTURE_2D, brdfTexture);
-        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG16F, 512, 512);
+    	brdfTexture.create(512, 512, GL_TEXTURE_2D, GL_RG16F, 1);
         // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		brdfTexture.parameter(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        brdfTexture.parameter(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        brdfTexture.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        brdfTexture.parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         // rescale capture framebuffer to brdf texture
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfTexture, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfTexture.m_TextureID, 0);
 
         ProgramShader programBrdf;
         programBrdf.initalize();
@@ -967,11 +917,6 @@ namespace {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_triangle.draw();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-
-	void prepareRender()
-	{
-		convertEquirectangularToCubemap();
 	}
 
     void render()
@@ -994,12 +939,10 @@ namespace {
 		m_programSky.bind();
 
 		// Texture binding
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
+		envCubemap.bind(0);
+		irradianceCubemap.bind(1);
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap.m_TextureID);
 
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );
@@ -1018,12 +961,9 @@ namespace {
 		glEnable( GL_DEPTH_TEST ); 
 
 		// Sumbit view 1.
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, brdfTexture);
+		irradianceCubemap.bind(4);
+		prefilterCubemap.bind(5);
+		brdfTexture.bind(6);
 
         m_programMesh.bind();
 		// Uniform binding

@@ -3,9 +3,9 @@
 #include "BaseTexture.h"
 
 namespace {
-    std::string GetFileExtension(const std::string& Filename)
+    std::string GetFileExtension(const std::string& filename)
     {
-        return Filename.substr(Filename.find_last_of(".") + 1);
+        return filename.substr(filename.find_last_of(".") + 1);
     }
 
     bool Stricompare(const std::string& str1, const std::string& str2) {
@@ -70,14 +70,13 @@ namespace {
 }
 
 BaseTexture::BaseTexture() :
-    m_bGenerateMipmap(true),
 	m_TextureID(0),
 	m_Target(GL_INVALID_ENUM),
-    m_MinFilter(GL_LINEAR_MIPMAP_LINEAR),
-    m_MagFilter(GL_LINEAR),
-    m_WrapS(GL_CLAMP_TO_EDGE),
-    m_WrapT(GL_CLAMP_TO_EDGE),
-    m_WrapR(GL_CLAMP_TO_EDGE)
+	m_Format(GL_INVALID_ENUM),
+	m_Width(0),
+	m_Height(0),
+	m_Depth(0),
+	m_MipCount(0)
 {
 }
 
@@ -86,19 +85,38 @@ BaseTexture::~BaseTexture()
 	destroy();
 }
 
-bool BaseTexture::create(const std::string& Filename)
+bool BaseTexture::create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels)
 {
-    if (Filename.empty()) return false;
-    std::string ext = GetFileExtension(Filename);
+	GLuint TextureName = 0;
+	glGenTextures(1, &TextureName);
+	glBindTexture(target, TextureName);
+	glTexStorage2D(target, levels, format, width, height);
+	glBindTexture(target, 0);
+
+	m_Target = target;
+	m_TextureID = TextureName;
+	m_Format = format;
+	m_Width = width;
+	m_Height = height;
+	m_Depth = 1;
+	m_MipCount = levels;
+
+	return true;
+}
+
+bool BaseTexture::create(const std::string& filename)
+{
+    if (filename.empty()) return false;
+    std::string ext = GetFileExtension(filename);
     if (Stricompare(ext, "DDX") || Stricompare(ext, "DDS"))
-        return createFromFileGLI(Filename);
-    return createFromFileSTB(Filename);
+        return createFromFileGLI(filename);
+    return createFromFileSTB(filename);
 } 
 
-// Filename can be KTX or DDS files
-bool BaseTexture::createFromFileGLI(const std::string& Filename)
+// filename can be KTX or DDS files
+bool BaseTexture::createFromFileGLI(const std::string& filename)
 {
-	gli::texture Texture = gli::load(Filename);
+	gli::texture Texture = gli::load(filename);
 	if(Texture.empty())
 		return false;
 
@@ -115,12 +133,6 @@ bool BaseTexture::createFromFileGLI(const std::string& Filename)
 	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_G, Format.Swizzles[1]);
 	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_B, Format.Swizzles[2]);
 	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_A, Format.Swizzles[3]);
-
-	glTexParameteri(Target, GL_TEXTURE_WRAP_S, m_WrapS);
-	glTexParameteri(Target, GL_TEXTURE_WRAP_T, m_WrapT);
-	glTexParameteri(Target, GL_TEXTURE_WRAP_R, m_WrapR);
-	glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, m_MinFilter);
-	glTexParameteri(Target, GL_TEXTURE_MAG_FILTER, m_MagFilter);
 
 	glm::tvec3<GLsizei> const Extent(Texture.extent());
 	GLsizei const FaceTotal = static_cast<GLsizei>(Texture.layers() * Texture.faces());
@@ -222,12 +234,17 @@ bool BaseTexture::createFromFileGLI(const std::string& Filename)
 	}
 	m_Target = Target;
 	m_TextureID = TextureName;
+	m_MipCount = static_cast<GLint>(Texture.levels());
+	m_Format = Format.Type;
+	m_Width = Extent.x;
+	m_Height = Extent.y;
+	m_Depth = Texture.target() == gli::TARGET_3D ? Extent.z : FaceTotal;
 	glBindTexture(Target, 0);
 	return true;
 }
 
-// Filename can be JPG, PNG, TGA, BMP, PSD, GIF, HDR, PIC files
-bool BaseTexture::createFromFileSTB(const std::string& Filename)
+// filename can be JPG, PNG, TGA, BMP, PSD, GIF, HDR, PIC files
+bool BaseTexture::createFromFileSTB(const std::string& filename)
 {
     stbi_set_flip_vertically_on_load(true);
 
@@ -235,21 +252,17 @@ bool BaseTexture::createFromFileSTB(const std::string& Filename)
     GLenum Type = GL_UNSIGNED_BYTE;
     int Width = 0, Height = 0, nrComponents = 0;
     void* Data = nullptr;
-    std::string Ext = GetFileExtension(Filename);
+    std::string Ext = GetFileExtension(filename);
     if (Stricompare(Ext, "HDR"))
     {
         Type = GL_FLOAT;
-        Data = stbi_loadf(Filename.c_str(), &Width, &Height, &nrComponents, 0);
+        Data = stbi_loadf(filename.c_str(), &Width, &Height, &nrComponents, 0);
     }
     else
     {
-        Data = stbi_load(Filename.c_str(), &Width, &Height, &nrComponents, 0);
+        Data = stbi_load(filename.c_str(), &Width, &Height, &nrComponents, 0);
     }
     if (!Data) return false;
-
-    GLuint MaxLevel = 0;
-    if (m_bGenerateMipmap)
-        MaxLevel = GLuint(std::floor(std::log2(std::max(Width, Height))));
 
     GLenum Format = GetComponent(nrComponents);
     GLenum InternalFormat = GetInternalComponent(nrComponents, Type == GL_FLOAT);
@@ -257,23 +270,20 @@ bool BaseTexture::createFromFileSTB(const std::string& Filename)
 	GLuint TextureName = 0;
 	glGenTextures(1, &TextureName);
 	glBindTexture(Target, TextureName);
-    glTexStorage2D(Target, MaxLevel+1, InternalFormat, Width, Height);
+
+	// Use fixed storage
+    glTexStorage2D(Target, 1, InternalFormat, Width, Height);
     glTexSubImage2D(Target, 0, 0, 0, Width, Height, Format, Type, Data);
-    if (m_bGenerateMipmap)
-        glGenerateMipmap(Target);
 
     stbi_image_free(Data);
 
-    glTexParameteri(Target, GL_TEXTURE_WRAP_S, m_WrapS);
-    glTexParameteri(Target, GL_TEXTURE_WRAP_T, m_WrapT);
-    glTexParameteri(Target, GL_TEXTURE_WRAP_R, m_WrapR);
-    glTexParameteri(Target, GL_TEXTURE_MIN_FILTER, m_MinFilter);
-    glTexParameteri(Target, GL_TEXTURE_MAG_FILTER, m_MagFilter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, MaxLevel);
-
 	m_Target = Target;
 	m_TextureID = TextureName;
+	m_Format = Type;
+	m_Width = Width;
+	m_Height = Height;
+	m_Depth = 1;
+	m_MipCount = 1;
 	glBindTexture(Target, 0);
 	return true;
 }
@@ -301,7 +311,36 @@ void BaseTexture::unbind(GLuint unit) const
 	glBindTexture(m_Target, 0u);
 }
 
-void BaseTexture::setGenerateMipmap(bool bGenerate)
+void BaseTexture::generateMipmap()
 {
-    m_bGenerateMipmap = bGenerate;
+	assert(m_Target != GL_INVALID_ENUM);
+	assert(m_TextureID != 0);
+
+	glBindTexture(m_Target, m_TextureID);
+	glGenerateMipmap(m_Target);
+	glBindTexture(m_Target, 0u);
 }
+
+void BaseTexture::parameter(GLenum pname, GLint param)
+{
+	assert(m_Target != GL_INVALID_ENUM);
+	assert(m_TextureID != 0);
+
+	// Access violation in OSX
+    // glTextureParameteri(textureID, GL_TEXTURE_2D, pname, param);
+	glBindTexture(m_Target, m_TextureID);
+    glTexParameteri(m_Target, pname, param);
+}
+
+#if 0
+// Is it a better idea to make a texture immutable?
+void BaseTexture::setLevels(GLint count)
+{
+	assert(count >= 0);
+	for (...)
+	glCopyImageSubData(
+		tex1, GL_TEXTURE_2D, 0, 0, 0, 0,
+		tex2, GL_TEXTURE_2D, 0, 0, 0, 0,
+		m_Width, m_Height, m_Depth);
+}
+#endif

@@ -5,27 +5,28 @@
 
 class BaseTexture
 {
-private:
-    bool createFromFileGLI(const std::string& Filename);
-    bool createFromFileSTB(const std::string& Filename);
-
 public:
+
 	BaseTexture();
     virtual ~BaseTexture();
 
-	bool create(const std::string& Filename);
+	bool create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels);
+	bool create(const std::string& filename);
 	void destroy();
 	void bind(GLuint unit) const;
 	void unbind(GLuint unit) const;
-    void setGenerateMipmap(bool bGenerate = true);
+	void generateMipmap();
+	void parameter(GLenum pname, GLint param);
 
-    bool m_bGenerateMipmap; // Support STB loader only
+    bool createFromFileGLI(const std::string& filename);
+    bool createFromFileSTB(const std::string& filename);
+
 	GLuint m_TextureID;
 	GLenum m_Target;
-    GLenum m_MinFilter;
-    GLenum m_MagFilter;
-    GLenum m_WrapS;
-    GLenum m_WrapT;
-    GLenum m_WrapR;
+	GLenum m_Format;
+	GLint m_Width;
+	GLint m_Height;
+	GLint m_Depth;
+	GLint m_MipCount;
 };
 

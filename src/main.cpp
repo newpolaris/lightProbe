@@ -478,7 +478,9 @@ namespace {
 		}
         
         glfwWindowHint(GLFW_SAMPLES, 4);
+    #ifdef _DEBUG
         glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+    #endif
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
@@ -840,15 +842,15 @@ namespace {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // 8. create a prefilter cubemap and allocate mips
-        GLsizei prefilterSize = 128;
+        GLsizei prefilterSize = 256;
 		prefilterCubemap.create(prefilterSize, prefilterSize, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 7);
 		prefilterCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
         // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
-		// glCopyImageSubData(
-		//		envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 2, 0, 0, 0,
-		//		prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0, 
-		//		128, 128, 6);
+		glCopyImageSubData(
+            envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 1, 0, 0, 0,
+            prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
+            prefilterSize, prefilterSize, 6);
 
         ProgramShader programPrefilter;
         programPrefilter.initalize();
@@ -860,17 +862,17 @@ namespace {
 		programPrefilter.setUniform("projection", captureProjection);
 
 		envCubemap.bind(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         {
-            int maxMipLevels = 5;
             PROFILEGL("Prefilter cubemap");
-            for (int mip = 0; mip < maxMipLevels; mip++)
+            int maxMipLevels = 5;
+            glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+            glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+            for (int mip = 1; mip < maxMipLevels; mip++)
             {
                 // resize render buffer to prefilter scale
                 GLsizei width = prefilterSize * std::pow(0.5, mip);
                 GLsizei height = prefilterSize * std::pow(0.5, mip);
 
-                glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
                 glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
                 glViewport(0, 0, width, height);
 
@@ -886,8 +888,8 @@ namespace {
                     m_cube.draw();
                 }
             }
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // 10. Generate a 2D LUT from the BRDF quation used.
     	brdfTexture.create(512, 512, GL_TEXTURE_2D, GL_RG16F, 1);

@@ -122,7 +122,7 @@ void main()
   else
   {
     // Omit 0th mip which roughness is 0.0. it is similar to the result of non filtered
-    color = textureLod(uEnvmapPrefilter, dir, uBgType);
+    color = textureLod(uEnvmapPrefilter, dir, uBgType-1);
   }
 
   color *= exp2(uExposure);

@@ -190,6 +190,7 @@ namespace
 	void mainLoopApp();
     void moveCamera( int key, bool isPressed );
 	void prepareRender();
+    void updateLightProbe();
     void render();
 	void renderHUD();
     void renderTestCubeSample();
@@ -226,7 +227,7 @@ void APIENTRY OpenglCallbackFunction(GLenum source,
     using namespace std;
 
     // ignore these non-significant error codes
-    if (id == 131169 || id == 131185 || id == 131218 || id == 131204) 
+    if (id == 131169 || id == 131185 || id == 131218 || id == 131204 || id == 131184) 
         return;
 
     cout << "---------------------opengl-callback-start------------" << endl;
@@ -332,7 +333,7 @@ namespace {
 		// GLSW : shader file manager
 		glswInit();
 		glswSetPath("./shaders/", ".glsl");
-		glswAddDirectiveToken("*", "#version 330 core");
+		glswAddDirectiveToken("*", "#version 440 core");
 
         // App Objects
         camera.setViewParams( glm::vec3( 5.0f, 5.0f, 20.0f), glm::vec3( 5.0f, 5.0f, 0.0f) );
@@ -378,6 +379,7 @@ namespace {
             "roughness.png",
         };
 
+    #if !_DEBUG
         for (int k = 0; k < 5; k++)
             for(int i = 0; i < 4; i++) 
             {
@@ -389,6 +391,7 @@ namespace {
 		{
             m_pistolTex[i].create("resource/pistol/" + textureTypename[i]);
 		}
+    #endif
 
         m_programMeshTex.initalize();
         m_programMeshTex.addShader(GL_VERTEX_SHADER, "IblMeshTex.Vertex");
@@ -737,7 +740,7 @@ namespace {
 		ImGui::End();
 	}
 
-	void prepareRender()
+    void updateLightProbe()
 	{
 		// 1. setup framebuffer
 		unsigned int captureFBO;
@@ -843,7 +846,7 @@ namespace {
 
         // 8. create a prefilter cubemap and allocate mips
         GLsizei prefilterSize = 256;
-		prefilterCubemap.create(prefilterSize, prefilterSize, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 7);
+		prefilterCubemap.create(prefilterSize, prefilterSize, GL_TEXTURE_CUBE_MAP, GL_RGBA16F, 8);
 		prefilterCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
         // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
@@ -852,17 +855,19 @@ namespace {
             prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
             prefilterSize, prefilterSize, 6);
 
-        ProgramShader programPrefilter;
-        programPrefilter.initalize();
-        programPrefilter.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
-        programPrefilter.addShader(GL_FRAGMENT_SHADER, "Prefilter.Fragment");
-        programPrefilter.link();  
-		programPrefilter.bind();
-		programPrefilter.setUniform("environmentCube", 0);
-		programPrefilter.setUniform("projection", captureProjection);
-
-		envCubemap.bind(0);
+        if (1)
         {
+            ProgramShader programPrefilter;
+            programPrefilter.initalize();
+            programPrefilter.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
+            programPrefilter.addShader(GL_FRAGMENT_SHADER, "Prefilter.Fragment");
+            programPrefilter.link();
+            programPrefilter.bind();
+            programPrefilter.setUniform("environmentCube", 0);
+            programPrefilter.setUniform("projection", captureProjection);
+
+            envCubemap.bind(0);
+
             PROFILEGL("Prefilter cubemap");
             int maxMipLevels = 5;
             glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
@@ -889,6 +894,33 @@ namespace {
                 }
             }
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+        else
+        {
+            PROFILEGL("Prefilter cubemap");
+            glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+            const int localSize = 4;
+            // Skip mipLevel 0
+            auto size = prefilterSize/2;
+            auto mipLevel = 1;
+            auto maxLevel = int(glm::floor(glm::log2(float(size))));
+            envCubemap.bind(0);
+            ProgramShader programPrefilter;
+            programPrefilter.initalize();
+            programPrefilter.addShader(GL_COMPUTE_SHADER, "Radiance.Compute");
+            programPrefilter.link();
+            programPrefilter.bind();
+            programPrefilter.setUniform("uEnvMap", 0);
+            for (auto tsize = size; tsize > 0; tsize /= 2)
+            {
+                programPrefilter.setUniform("uRoughness", float(mipLevel) / maxLevel); 
+                glBindImageTexture(0, prefilterCubemap.m_TextureID, 
+                    mipLevel, GL_TRUE, 6, GL_WRITE_ONLY, GL_RGBA16F);
+                glDispatchCompute((tsize-1) / localSize + 1, (tsize-1) / localSize + 1, 6);
+                mipLevel++;
+            }
+            glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
         }
 
         // 10. Generate a 2D LUT from the BRDF quation used.
@@ -1081,6 +1113,11 @@ namespace {
         }
         m_programMesh.unbind();
 		glDisable( GL_TEXTURE_CUBE_MAP_SEAMLESS );  
+    }
+
+	void prepareRender()
+    {
+        updateLightProbe();
     }
 
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 

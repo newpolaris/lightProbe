@@ -6,6 +6,7 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 layout(rgba16f, binding=0) uniform writeonly imageCube uCube;
 
 const uint sampleCount = 32u;
+shared float fSampleMipLevels[sampleCount];
 shared vec3 vSampleDirections[sampleCount];
 
 uniform samplerCube uEnvMap;
@@ -62,6 +63,26 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
     return nom / denom;
 }
 
+float CalcMipLevel(vec3 H, float Roughness)
+{
+    // sample from the environment's mip level based on roughness/pdf
+    float D = DistributionGGX(vec3(0, 0, 1), H, Roughness);
+    float ndoth = max(H.z, 0.0);
+    float hdotv = max(H.z, 0.0);
+    float pdf = D * ndoth / (4.0 * hdotv) + 0.0001;
+    float resolution = 512.0; // resolution of source cubemap (per face)
+    // Solid angle covered by 1 pixel with 6 faces that are resolution x resolution
+    float omegaP = 4.0 * pi / (6.0 * resolution * resolution);
+    // Solid angle represented by this sample
+    float omegaS = 1.0 / (float(sampleCount) * pdf + 0.0001);
+    // Original paper suggest biasing the mip to improve the results	
+    float mipBias = 1.0;
+    float mipLevel = 0.0;
+    // Remove dot pattern at roughness 0
+    if(Roughness > 0.0)
+        mipLevel = max(0.5 * log2(omegaS / omegaP) + mipBias, 0.0);
+    return mipLevel;
+}
 
 vec3 PrefilterEnvMap(float Roughness, vec3 R)
 {
@@ -84,22 +105,7 @@ vec3 PrefilterEnvMap(float Roughness, vec3 R)
 		float ndotl = max(dot(N, L), 0.0);
 		if (ndotl > 0)
 		{
-			// sample from the environment's mip level based on roughness/pdf
-			float D = DistributionGGX(N, H, Roughness);
-			float ndoth = max(dot(N, H), 0.0);
-			float hdotv = max(dot(H, V), 0.0);
-			float pdf = D * ndoth / (4.0 * hdotv) + 0.0001;
-			float resolution = 512.0; // resolution of source cubemap (per face)
-			// Solid angle covered by 1 pixel with 6 faces that are resolution x resolution
-			float omegaP = 4.0 * pi / (6.0 * resolution * resolution);
-			// Solid angle represented by this sample
-			float omegaS = 1.0 / (float(sampleCount) * pdf + 0.0001);
-			// Original paper suggest biasing the mip to improve the results	
-			float mipBias = 1.0;
-			float mipLevel = 0.0;
-            // Remove dot pattern at roughness 0
-            if (Roughness > 0.0)
-                mipLevel = max(0.5 * log2(omegaS / omegaP) + mipBias, 0.0);
+            float mipLevel = fSampleMipLevels[s];
 			prefilterColor += textureLod(uEnvMap, L, mipLevel).rgb * ndotl;
 			totalWeight += ndotl;
 		}
@@ -129,7 +135,9 @@ void main()
     if (si < sampleCount)
     {
         vec2 Xi = Hammersley(si, sampleCount);
-        vSampleDirections[si] = ImportanceSampleGGX(Xi, uRoughness);
+        vec3 H = ImportanceSampleGGX(Xi, uRoughness);
+        vSampleDirections[si] = H;
+        fSampleMipLevels[si] = CalcMipLevel(H, uRoughness);
     }
     memoryBarrierShared();
 

@@ -857,17 +857,13 @@ namespace {
         // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
         {
             PROFILEGL("Prefilter cubemap");
-            glCopyImageSubData(
-                envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 1, 0, 0, 0,
-                prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
-                prefilterSize, prefilterSize, 6);
 
             glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
             const int localSize = 16;
             // Skip mipLevel 0
-            auto size = prefilterSize/2;
-            auto mipLevel = 1;
+            auto size = prefilterSize;
+            auto mipLevel = 0;
             auto maxLevel = int(glm::floor(glm::log2(float(size))));
             envCubemap.bind(0);
             m_programPrefilter.bind();

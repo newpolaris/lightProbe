@@ -2,7 +2,7 @@
 
 -- Compute
 
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 layout(rgba16f, binding=0) uniform writeonly imageCube uCube;
 
 uniform samplerCube uEnvMap;
@@ -28,7 +28,7 @@ vec2 Hammersley(uint i, uint N)
 	return vec2(float(i)/float(N), RadicalInverse_VdC(i));
 }
 // ----------------------------------------------------------------------------
-vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
+vec3 ImportanceSampleGGX(vec2 Xi, float roughness)
 {
 	float a = roughness*roughness;
 	
@@ -41,14 +41,8 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 	H.x = cos(phi) * sinTheta;
 	H.y = sin(phi) * sinTheta;
 	H.z = cosTheta;
-	
-	// from tangent-space H vector to world-space sample vector
-	vec3 up        = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
-	vec3 tangent   = normalize(cross(up, N));
-	vec3 bitangent = cross(N, tangent);
-	
-	vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
-	return normalize(sampleVec);
+
+    return H;
 }
 // ----------------------------------------------------------------------------
 float DistributionGGX(vec3 N, vec3 H, float roughness)
@@ -71,6 +65,12 @@ vec3 PrefilterEnvMap(float Roughness, vec3 R)
 	vec3 N = R;
 	vec3 V = R;
 
+	// from tangent-space H vector to world-space sample vector
+	vec3 up        = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+	vec3 tangent   = normalize(cross(up, N));
+	vec3 bitangent = cross(N, tangent);
+    mat3 tangentToWorld = mat3(tangent, bitangent, N);
+	
 	vec3 prefilterColor = vec3(0.0);
 	float totalWeight = 0.0;
 	uint sampleCount = 32u;
@@ -78,7 +78,7 @@ vec3 PrefilterEnvMap(float Roughness, vec3 R)
 	{
 		// low discrepancy sequence
 		vec2 Xi = Hammersley(s, sampleCount);
-		vec3 H = ImportanceSampleGGX(Xi, N, Roughness);
+		vec3 H = tangentToWorld * ImportanceSampleGGX(Xi, Roughness);
 		vec3 L = normalize(2.0 * dot(V, H) * H - V);
 		float ndotl = max(dot(N, L), 0.0);
 		if (ndotl > 0)

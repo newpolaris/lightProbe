@@ -850,57 +850,16 @@ namespace {
 		prefilterCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
         // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
-		glCopyImageSubData(
-            envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 1, 0, 0, 0,
-            prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
-            prefilterSize, prefilterSize, 6);
-
-        if (1)
-        {
-            ProgramShader programPrefilter;
-            programPrefilter.initalize();
-            programPrefilter.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
-            programPrefilter.addShader(GL_FRAGMENT_SHADER, "Prefilter.Fragment");
-            programPrefilter.link();
-            programPrefilter.bind();
-            programPrefilter.setUniform("environmentCube", 0);
-            programPrefilter.setUniform("projection", captureProjection);
-
-            envCubemap.bind(0);
-
-            PROFILEGL("Prefilter cubemap");
-            int maxMipLevels = 5;
-            glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-            glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-            for (int mip = 1; mip < maxMipLevels; mip++)
-            {
-                // resize render buffer to prefilter scale
-                GLsizei width = prefilterSize * std::pow(0.5, mip);
-                GLsizei height = prefilterSize * std::pow(0.5, mip);
-
-                glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
-                glViewport(0, 0, width, height);
-
-                float roughness = float(mip) / float(maxMipLevels - 1);
-                programPrefilter.setUniform("uRoughness", roughness);
-                // solve quasi monte-carlo integral for each face and a given roughness
-                for (int i = 0; i < 6; i++)
-                {
-                    programPrefilter.setUniform("view", captureViews[i]);
-                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterCubemap.m_TextureID, mip);
-                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-                    m_cube.draw();
-                }
-            }
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
-        else
         {
             PROFILEGL("Prefilter cubemap");
+            glCopyImageSubData(
+                envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 1, 0, 0, 0,
+                prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
+                prefilterSize, prefilterSize, 6);
+
             glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
-            const int localSize = 4;
+            const int localSize = 16;
             // Skip mipLevel 0
             auto size = prefilterSize/2;
             auto mipLevel = 1;

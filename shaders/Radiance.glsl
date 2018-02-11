@@ -5,6 +5,9 @@
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 layout(rgba16f, binding=0) uniform writeonly imageCube uCube;
 
+const uint sampleCount = 32u;
+shared vec2 hammersleySequence[sampleCount];
+
 uniform samplerCube uEnvMap;
 uniform float uRoughness;
 
@@ -73,11 +76,10 @@ vec3 PrefilterEnvMap(float Roughness, vec3 R)
 	
 	vec3 prefilterColor = vec3(0.0);
 	float totalWeight = 0.0;
-	uint sampleCount = 32u;
 	for (uint s = 0u; s < sampleCount; s++)
 	{
 		// low discrepancy sequence
-		vec2 Xi = Hammersley(s, sampleCount);
+		vec2 Xi = hammersleySequence[s];
 		vec3 H = tangentToWorld * ImportanceSampleGGX(Xi, Roughness);
 		vec3 L = normalize(2.0 * dot(V, H) * H - V);
 		float ndotl = max(dot(N, L), 0.0);
@@ -124,6 +126,13 @@ vec3 Direction(float x, float y, uint l)
 
 void main()
 {
+    if (gl_LocalInvocationID == 0)
+    {
+        for (int i = 0; i < sampleCount; i++)
+            hammersleySequence[i] = Hammersley(i, sampleCount);
+    }
+    memoryBarrierShared();
+
 	uint x = gl_GlobalInvocationID.x;	
 	uint y = gl_GlobalInvocationID.y;
 	uint l = gl_GlobalInvocationID.z;

@@ -161,6 +161,7 @@ namespace
     ProgramShader m_programMesh;
     ProgramShader m_programMeshTex;
     ProgramShader m_programSky;
+    ProgramShader m_programPrefilter;
     BaseTexture m_pistolTex[4];
 	BaseTexture m_pbrTex[5][4];
     SphereMesh m_sphere( 48, 5.0f );
@@ -407,6 +408,10 @@ namespace {
         m_programSky.addShader(GL_VERTEX_SHADER, "IblSkyBox.Vertex");
         m_programSky.addShader(GL_FRAGMENT_SHADER, "IblSkyBox.Fragment");
         m_programSky.link();  
+
+        m_programPrefilter.initalize();
+        m_programPrefilter.addShader(GL_COMPUTE_SHADER, "Radiance.Compute");
+        m_programPrefilter.link();
 
 		// to prevent osx input bug
 		fflush(stdout);
@@ -865,15 +870,11 @@ namespace {
             auto mipLevel = 1;
             auto maxLevel = int(glm::floor(glm::log2(float(size))));
             envCubemap.bind(0);
-            ProgramShader programPrefilter;
-            programPrefilter.initalize();
-            programPrefilter.addShader(GL_COMPUTE_SHADER, "Radiance.Compute");
-            programPrefilter.link();
-            programPrefilter.bind();
-            programPrefilter.setUniform("uEnvMap", 0);
+            m_programPrefilter.bind();
+            m_programPrefilter.setUniform("uEnvMap", 0);
             for (auto tsize = size; tsize > 0; tsize /= 2)
             {
-                programPrefilter.setUniform("uRoughness", float(mipLevel) / maxLevel); 
+                m_programPrefilter.setUniform("uRoughness", float(mipLevel) / maxLevel); 
                 glBindImageTexture(0, prefilterCubemap.m_TextureID, 
                     mipLevel, GL_TRUE, 6, GL_WRITE_ONLY, GL_RGBA16F);
                 glDispatchCompute((tsize-1) / localSize + 1, (tsize-1) / localSize + 1, 6);

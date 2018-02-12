@@ -814,7 +814,7 @@ namespace {
 		envCubemap.generateMipmap();
 
         // 6. create an irradiance cubemap, and re-scale capture FBO to irradiance scale.
-        uint32_t irradianceSize = 16;
+        uint32_t irradianceSize = 32;
 		irradianceCubemap.create(irradianceSize, irradianceSize, GL_TEXTURE_CUBE_MAP, GL_RGBA16F, 1);
 		irradianceCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
 
@@ -825,27 +825,21 @@ namespace {
         // 7. solve diffuse integral by convolution to create an irradiance cbuemap
         ProgramShader programIrradiance;
         programIrradiance.initalize();
-        programIrradiance.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
-        programIrradiance.addShader(GL_FRAGMENT_SHADER, "Irradiance.Fragment");
+        programIrradiance.addShader(GL_COMPUTE_SHADER, "Irradiance.Compute");
         programIrradiance.link();  
-		programIrradiance.bind();
-		programIrradiance.setUniform("environmentCube", 0);
-		programIrradiance.setUniform("projection", captureProjection);
-
 		envCubemap.bind(0);
-
-        glViewport(0, 0, irradianceSize, irradianceSize);
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         {
             PROFILEGL("Irradiance cubemap");
-            for (int i = 0; i < 6; i++)
-            {
-                programIrradiance.setUniform("view", captureViews[i]);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap.m_TextureID, 0);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-                m_cube.draw();
-            }
+            const int localSize = 16;
+            glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+            envCubemap.bind(0);
+            m_programPrefilter.bind();
+            m_programPrefilter.setUniform("uEnvMap", 0);
+            // Set layered true to use whole cube face
+            glBindImageTexture(0, irradianceCubemap.m_TextureID,
+                0, GL_TRUE, 0, GL_WRITE_ONLY, irradianceCubemap.m_Format);
+            glDispatchCompute((irradianceSize - 1) / localSize + 1, (irradianceSize - 1) / localSize + 1, 6);
+            glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 

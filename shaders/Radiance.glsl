@@ -99,12 +99,14 @@ vec3 PrefilterEnvMap(float Roughness, vec3 R)
     mat3 tangentToWorld = mat3(tangent, bitangent, N);
 	
 	vec3 prefilterColor = vec3(0.0);
+    float weight = 0.0;
 	for (uint s = 0u; s < sampleCount; s++)
 	{
 		vec3 L = tangentToWorld * vSampleDirections[s];
         prefilterColor += textureLod(uEnvMap, L, fSampleMipLevels[s]).rgb * fSampleWeights[s];
+        weight += fSampleWeights[s];
 	}
-	return prefilterColor * fInvTotalWeight;
+	return prefilterColor / weight;
 }
 
 // Use code glow-extras's
@@ -131,6 +133,7 @@ void main()
         vec3 H = ImportanceSampleGGX(Xi, uRoughness);
     	vec3 V = vec3(0, 0, 1);
 	
+        // Optimized local coordinate ref. placeholderart [7]
         float mipLevel = CalcMipLevel(H, uRoughness);
 
         // Compute local reflected vector L from H
@@ -139,17 +142,12 @@ void main()
         vSampleDirections[si] = L;
         fSampleWeights[si] = L.z;
     }
-    barrier();
+    // Ensure shared memory writes are visible to work group
     memoryBarrierShared();
-    if (si == 0)
-    {
-        float sum = 0;
-        for (int i = 0; i < sampleCount; i++)
-            sum += fSampleWeights[i];
-        fInvTotalWeight = 1.0/sum;
-    }
+
+    // Ensure all threads in work group   
+    // have executed statements above
     barrier();
-    memoryBarrierShared();
 
 	uint x = gl_GlobalInvocationID.x;	
 	uint y = gl_GlobalInvocationID.y;

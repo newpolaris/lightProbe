@@ -17,6 +17,7 @@ OpenGL + GLFW + AssImp + ImGUI + GLI + Stbi
 4. Epic game's pbr related publication
 5. tcoppex/m2-irradiance-env-map
 6. bgfx example 18-ibl
+7. https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
 
 [![link text](./screenshots/pistol.jpg)](./screenshots/pistol.jpg)
 [![link text](./screenshots/orbs.jpg)](./screenshots/orbs.jpg)

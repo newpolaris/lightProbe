@@ -770,7 +770,7 @@ namespace {
 		newportTex.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 3. setup cubemap to render to and attach to framebuffer
-		envCubemap.create(512, 512, GL_TEXTURE_CUBE_MAP, GL_RGBA16F, 7);
+		envCubemap.create(512, 512, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 7);
 		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 4. set up projection and view matrices for capturing data onto the 6 cubemap face directions

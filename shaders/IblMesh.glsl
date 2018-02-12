@@ -235,6 +235,15 @@ mat3 calcTbn(vec3 _normal, vec3 _worldPos, vec2 _texCoords)
     return mat3(T, B, N);
 }
 
+// serach 'moving frostbite to pbr' for details
+vec3 getSpecularDomninantDir(vec3 N, vec3 R, float roughness)
+{
+    float smoothness = 1 - roughness;
+    float lerpFactor = smoothness * (sqrt(smoothness) + roughness);
+    // The result is not normalized as we fetch in a cubemap
+    return mix(N, R, lerpFactor);
+}
+
 void main()
 {  
   // Material params. uMetallicMap
@@ -294,8 +303,8 @@ void main()
 
   float ndotv = clamp(dot(nn, vv), 0.0, 1.0);
   vec3 envFresnel = calcFresnel(f0, ndotv, 1);
-  vec3 r = reflect(-vv, nn); 
-  vec3 vr = 2.0*ndotv*nn - vv; // Same as: -reflect(vv, nn);
+  vec3 r = 2.0 * nn * ndotv - vv; // =reflect(-toCamera, normal) 
+  r = getSpecularDomninantDir(nn, r, inRoughness);
   vec3 kS = envFresnel;
   vec3 kD = 1.0 - envFresnel;
   vec3 irradiance  = texture(uEnvmapIrr, nn).xyz;

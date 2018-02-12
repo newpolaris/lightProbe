@@ -102,9 +102,10 @@ vec3 PrefilterEnvMap(float Roughness, vec3 R)
     float weight = 0.0;
 	for (uint s = 0u; s < sampleCount; s++)
 	{
+        float w = fSampleWeights[s];
 		vec3 L = tangentToWorld * vSampleDirections[s];
-        prefilterColor += textureLod(uEnvMap, L, fSampleMipLevels[s]).rgb * fSampleWeights[s];
-        weight += fSampleWeights[s];
+        prefilterColor += textureLod(uEnvMap, L, fSampleMipLevels[s]).rgb * w;
+        weight += w;
 	}
 	return prefilterColor / weight;
 }

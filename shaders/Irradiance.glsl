@@ -23,7 +23,7 @@ void main()
     vec3 right = normalize(cross(up, normal));
     up = cross(normal, right);
 
-	float sampleDelta = 0.025;
+	float sampleDelta = 0.20;
 	float nrSampleCount = 0.0;
 	vec3 irradiance = vec3(0.0);
 
@@ -35,7 +35,7 @@ void main()
 			vec3 tangentSample = vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
 			// tangent space to world
 			vec3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * normal;
-			irradiance += texture(environmentCube, sampleVec).rgb * cos(theta) * sin(theta);
+			irradiance += textureLod(environmentCube, sampleVec, 7).rgb * cos(theta) * sin(theta);
 			nrSampleCount++;
 
 		}

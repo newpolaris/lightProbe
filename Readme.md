@@ -1,7 +1,5 @@
-* Use code from [1] for irraidance code
-* Use code from [2] for brdf and resource allocation code
-* Use code from [3] for sequence code
-* Use code from [4] for split sum and other pbr code
+* Use code from [2] for brdf and dynamic cube map
+* Use code from [4] for split sum and pbr related code
 * Use code from [5] for some gl utility
 * Use code from [6] for imgui code
 
@@ -11,7 +9,7 @@ Use resource from artisaverb.info
 OpenGL + GLFW + AssImp + ImGUI + GLI + Stbi 
 
 [reference]
-1. GPU Pro3 Chapter20
+1. GPU Gem2 Chapter 10. Real-Time Computation of Dynamic Irradiance Environment Maps
 2. https://learnopengl.com/PBR/IBL/Specular-IBL
 3. http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
 4. Epic game's pbr related publication

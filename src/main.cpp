@@ -105,14 +105,14 @@ struct Settings
 		m_lightCol = glm::vec3(0.5f, 0.f, 0.f);
 		m_glossiness = 0.7f;
 		m_exposure = 0.0f;
-		m_bgType = 3.0f;
+		m_bgType = 7.0f;
 		m_radianceSlider = 2.0f;
 		m_reflectivity = 0.85f;
 		m_rgbDiff = glm::vec3(0.2f, 0.2f, 0.2f);
 		m_rgbSpec = glm::vec3(1.f);
 		m_lod = 0.0f;
-		m_doDiffuse = true;
-		m_doSpecular = true;
+		m_doDiffuse = false;
+		m_doSpecular = false;
 		m_doDiffuseIbl = true;
 		m_doSpecularIbl = true;
 		m_showLightColorWheel = true;
@@ -814,13 +814,13 @@ namespace {
 		envCubemap.generateMipmap();
 
         // 6. create an irradiance cubemap, and re-scale capture FBO to irradiance scale.
-        uint32_t irradianceWidth = 32, irradianceHeight = 32;
-		irradianceCubemap.create(irradianceWidth, irradianceHeight, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 1);
+        uint32_t irradianceSize = 16;
+		irradianceCubemap.create(irradianceSize, irradianceSize, GL_TEXTURE_CUBE_MAP, GL_RGBA16F, 1);
 		irradianceCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
 
 		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, irradianceWidth, irradianceHeight);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, irradianceSize, irradianceSize);
 
         // 7. solve diffuse integral by convolution to create an irradiance cbuemap
         ProgramShader programIrradiance;
@@ -834,7 +834,7 @@ namespace {
 
 		envCubemap.bind(0);
 
-        glViewport(0, 0, irradianceWidth, irradianceHeight);
+        glViewport(0, 0, irradianceSize, irradianceSize);
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         {
             PROFILEGL("Irradiance cubemap");
@@ -863,7 +863,6 @@ namespace {
                 prefilterSize, prefilterSize, 6);
 
             glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-
             const int localSize = 16;
             // Skip mipLevel 0
             auto size = prefilterSize/2;
@@ -968,6 +967,8 @@ namespace {
 
     void renderTexturedCube()
     {
+		glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );
+
 		irradianceCubemap.bind(4);
 		prefilterCubemap.bind(5);
 		brdfTexture.bind(6);
@@ -1024,6 +1025,7 @@ namespace {
             }
 		}
         m_programMeshTex.unbind();
+		glDisable( GL_TEXTURE_CUBE_MAP_SEAMLESS );
     }
 
     void renderTestCubeSample()

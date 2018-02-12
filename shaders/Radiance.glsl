@@ -6,8 +6,11 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 layout(rgba16f, binding=0) uniform writeonly imageCube uCube;
 
 const uint sampleCount = 32u;
-shared float fSampleMipLevels[sampleCount];
+
+shared float fInvTotalWeight;
 shared vec3 vSampleDirections[sampleCount];
+shared float fSampleMipLevels[sampleCount];
+shared float fSampleWeights[sampleCount];
 
 uniform samplerCube uEnvMap;
 uniform float uRoughness;
@@ -96,22 +99,12 @@ vec3 PrefilterEnvMap(float Roughness, vec3 R)
     mat3 tangentToWorld = mat3(tangent, bitangent, N);
 	
 	vec3 prefilterColor = vec3(0.0);
-	float totalWeight = 0.0;
 	for (uint s = 0u; s < sampleCount; s++)
 	{
-		// low discrepancy sequence
-		vec3 H = tangentToWorld * vSampleDirections[s];
-		vec3 L = normalize(2.0 * dot(V, H) * H - V);
-		float ndotl = max(dot(N, L), 0.0);
-		if (ndotl > 0)
-		{
-            float mipLevel = fSampleMipLevels[s];
-			prefilterColor += textureLod(uEnvMap, L, mipLevel).rgb * ndotl;
-			totalWeight += ndotl;
-		}
+		vec3 L = tangentToWorld * vSampleDirections[s];
+        prefilterColor += textureLod(uEnvMap, L, fSampleMipLevels[s]).rgb * fSampleWeights[s];
 	}
-
-	return prefilterColor / totalWeight;
+	return prefilterColor * fInvTotalWeight;
 }
 
 // Use code glow-extras's
@@ -136,9 +129,26 @@ void main()
     {
         vec2 Xi = Hammersley(si, sampleCount);
         vec3 H = ImportanceSampleGGX(Xi, uRoughness);
-        vSampleDirections[si] = H;
-        fSampleMipLevels[si] = CalcMipLevel(H, uRoughness);
+    	vec3 V = vec3(0, 0, 1);
+	
+        float mipLevel = CalcMipLevel(H, uRoughness);
+
+        // Compute local reflected vector L from H
+        vec3 L = normalize(2.0 * H.z * H - V);
+        fSampleMipLevels[si] = mipLevel;
+        vSampleDirections[si] = L;
+        fSampleWeights[si] = L.z;
     }
+    barrier();
+    memoryBarrierShared();
+    if (si == 0)
+    {
+        float sum = 0;
+        for (int i = 0; i < sampleCount; i++)
+            sum += fSampleWeights[i];
+        fInvTotalWeight = 1.0/sum;
+    }
+    barrier();
     memoryBarrierShared();
 
 	uint x = gl_GlobalInvocationID.x;	

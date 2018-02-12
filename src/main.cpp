@@ -875,8 +875,9 @@ namespace {
             for (auto tsize = size; tsize > 0; tsize /= 2)
             {
                 m_programPrefilter.setUniform("uRoughness", float(mipLevel) / maxLevel); 
+                // Set layered true to use whole cube face
                 glBindImageTexture(0, prefilterCubemap.m_TextureID, 
-                    mipLevel, GL_TRUE, 6, GL_WRITE_ONLY, GL_RGBA16F);
+                    mipLevel, GL_TRUE, 0, GL_WRITE_ONLY, prefilterCubemap.m_Format);
                 glDispatchCompute((tsize-1) / localSize + 1, (tsize-1) / localSize + 1, 6);
                 mipLevel++;
             }

@@ -26,9 +26,6 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw_gl3.h>
 
-#include <tools/stb_image.h>
-#include <tools/SimpleProfile.h>
-
 #include <tools/TCamera.hpp>
 #include <tools/Timer.hpp>
 #include <tools/Logger.hpp>
@@ -44,6 +41,7 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
+#include <LightProbe.h>
 
 namespace {
     // lights
@@ -64,36 +62,7 @@ namespace {
     int nrRows    = 7;
     int nrColumns = 7;
     float spacing = 2.5;
-
-	BaseTexture envCubemap;
-    BaseTexture irradianceCubemap;
-    BaseTexture prefilterCubemap;
-    BaseTexture brdfTexture;
 }
-
-struct LightProbe
-{
-	enum Enum
-	{
-		Bolonga,
-		Kyoto,
-
-		Count
-	};
-
-	void load(const std::string& name)
-	{
-		char filePath[512];
-		std::snprintf(filePath, _countof(filePath), "resource/%s_lod.dds", name.c_str());
-		m_Tex.create(filePath);
-
-		std::snprintf(filePath, _countof(filePath), "resource/%s_irr.dds", name.c_str());
-		m_TexIrr.create(filePath);
-	}
-
-	BaseTexture m_Tex;
-	BaseTexture m_TexIrr;
-};
 
 struct Settings
 {
@@ -161,20 +130,15 @@ namespace
     ProgramShader m_programMesh;
     ProgramShader m_programMeshTex;
     ProgramShader m_programSky;
-    ProgramShader m_programIrradiance;
-    ProgramShader m_programPrefilter;
-    ProgramShader m_programBrdf;
     BaseTexture m_pistolTex[4];
 	BaseTexture m_pbrTex[5][4];
     SphereMesh m_sphere( 48, 5.0f );
-    FullscreenTriangleMesh m_triangle;
     CubeMesh m_cube;
 	Settings m_settings;
 	ModelPtr m_pistol;
 	ModelPtr m_orb;
 
-	LightProbe m_lightProbes[LightProbe::Count];
-	LightProbe::Enum m_currentLightProbe;
+    std::shared_ptr<LightProbe> m_lightProbe;
 
     //?
 
@@ -193,7 +157,6 @@ namespace
 	void mainLoopApp();
     void moveCamera( int key, bool isPressed );
 	void prepareRender();
-    void updateLightProbe();
     void render();
 	void renderHUD();
     void renderTestCubeSample();
@@ -338,11 +301,14 @@ namespace {
 		glswSetPath("./shaders/", ".glsl");
 		glswAddDirectiveToken("*", "#version 440 core");
 
+        Timer::getInstance().start();
+
+        light_probe::initialize();
+
         // App Objects
         camera.setViewParams( glm::vec3( 5.0f, 5.0f, 20.0f), glm::vec3( 5.0f, 5.0f, 0.0f) );
         camera.setMoveCoefficient(0.35f);
 
-        Timer::getInstance().start();
 
         GLuint m_VertexArrayID;
         GL_ASSERT(glGenVertexArrays(1, &m_VertexArrayID));
@@ -350,7 +316,6 @@ namespace {
 
         m_sphere.init();
 		m_cube.init();
-		m_triangle.init();
 
 		m_pistol = std::make_shared<ModelAssImp>();
 		m_pistol->create();
@@ -360,13 +325,6 @@ namespace {
 
 		m_orb = std::make_shared<ModelAssImp>();
 		m_orb->create();
-
-    #if !_DEBUG
-		m_lightProbes[LightProbe::Bolonga].load("bolonga");
-		m_lightProbes[LightProbe::Kyoto  ].load("kyoto");
-    #endif
-
-        m_currentLightProbe = LightProbe::Bolonga;
 
         std::string type[] = {
             "rusted_iron", 
@@ -410,19 +368,6 @@ namespace {
         m_programSky.addShader(GL_VERTEX_SHADER, "IblSkyBox.Vertex");
         m_programSky.addShader(GL_FRAGMENT_SHADER, "IblSkyBox.Fragment");
         m_programSky.link();  
-
-        m_programIrradiance.initalize();
-        m_programIrradiance.addShader(GL_COMPUTE_SHADER, "Irradiance.Compute");
-        m_programIrradiance.link();  
-
-        m_programPrefilter.initalize();
-        m_programPrefilter.addShader(GL_COMPUTE_SHADER, "Radiance.Compute");
-        m_programPrefilter.link();
-
-        m_programBrdf.initalize();
-        m_programBrdf.addShader(GL_VERTEX_SHADER, "Brdf.Vertex");
-        m_programBrdf.addShader(GL_FRAGMENT_SHADER, "Brdf.Fragment");
-        m_programBrdf.link();  
 
 		// to prevent osx input bug
 		fflush(stdout);
@@ -528,12 +473,12 @@ namespace {
 		m_pistol->destroy();
 		m_orb->destroy();
         glswShutdown();  
+        light_probe::shutdown();
         m_programMesh.destroy();
         m_programMeshTex.destroy();
         m_programSky.destroy();
         m_sphere.destroy();
 		m_cube.destroy();
-		m_triangle.destroy();
 
         for (int k = 0; k < 5; k++)
             for(int i = 0; i < 4; i++) 
@@ -609,20 +554,6 @@ namespace {
 		ImGui::Indent();
 		ImGui::Checkbox("IBL Diffuse",  &m_settings.m_doDiffuseIbl);
 		ImGui::Checkbox("IBL Specular", &m_settings.m_doSpecularIbl);
-		{
-			float tabWidth = ImGui::GetContentRegionAvailWidth() / 2.0f;
-			if (ImGui::TabButton("Bolonga", tabWidth, m_currentLightProbe == LightProbe::Bolonga) )
-			{
-				m_currentLightProbe = LightProbe::Bolonga;
-			}
-
-			ImGui::SameLine(0.0f,0.0f);
-
-			if (ImGui::TabButton("Kyoto", tabWidth, m_currentLightProbe == LightProbe::Kyoto) )
-			{
-				m_currentLightProbe = LightProbe::Kyoto;
-			}
-		}
 		ImGui::SliderFloat("Texture LOD", &m_settings.m_lod, 0.0f, 10.1f);
 		ImGui::Unindent();
 
@@ -756,154 +687,6 @@ namespace {
 		ImGui::End();
 	}
 
-    void updateLightProbe()
-	{
-		// 1. setup framebuffer
-		unsigned int captureFBO = 0;
-		unsigned int captureRBO = 0;
-        uint32_t envMapSize = 512;
-
-		glGenFramebuffers(1, &captureFBO);
-		glGenRenderbuffers(1, &captureRBO);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-		glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, envMapSize, envMapSize);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
-
-		// 2. load the HDR environment map
-        BaseTexture newportTex;
-        if (!newportTex.create("resource/newport_loft.hdr"))
-        {
-            fprintf(stderr, "fail to load texture");
-            glfwTerminate();
-            exit(EXIT_FAILURE);
-        }
-		newportTex.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-		// 3. setup cubemap to render to and attach to framebuffer
-        const uint32_t MipmapLevels = 8;
-		envCubemap.create(envMapSize, envMapSize, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 8);
-		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-		// 4. set up projection and view matrices for capturing data onto the 6 cubemap face directions
-		glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-		glm::mat4 captureViews[] =
-		{
-			glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-			glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-			glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-			glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-			glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-			glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
-		};
-
-		// 5. convert HDR equirectangular environment map to cubemap equivalent
-		ProgramShader equirectangularToCubemapShader;
-		equirectangularToCubemapShader.initalize();
-        equirectangularToCubemapShader.addShader(GL_VERTEX_SHADER, "Cubemap.Vertex");
-        equirectangularToCubemapShader.addShader(GL_FRAGMENT_SHADER, "EquirectangularToCubemap.Fragment");
-        equirectangularToCubemapShader.link();  
-		equirectangularToCubemapShader.bind();
-		equirectangularToCubemapShader.setUniform("equirectangularMap", 0);
-		equirectangularToCubemapShader.setUniform("projection", captureProjection);
-
-        newportTex.bind(0);
-
-        // don't forget to configure the viewport to the capture dimensions.
-		glViewport(0, 0, envMapSize, envMapSize); 
-		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-		for (unsigned int i = 0; i < 6; ++i)
-		{
-			equirectangularToCubemapShader.setUniform("view", captureViews[i]);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap.m_TextureID, 0);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			m_cube.draw();
-		}
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        // then let OpenGL generate mipmaps from first mip face (combatting visible dots artifact)
-		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		envCubemap.generateMipmap();
-
-        // 6. create an irradiance cubemap
-        uint32_t irradianceSize = 16;
-		irradianceCubemap.create(irradianceSize, irradianceSize, GL_TEXTURE_CUBE_MAP, GL_RGBA16F, 1);
-		irradianceCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
-
-        // 7. solve diffuse integral by convolution to create an irradiance cbuemap
-		envCubemap.bind(0);
-        {
-            PROFILEGL("Irradiance cubemap");
-            const int localSize = 16;
-            glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-            envCubemap.bind(0);
-            m_programIrradiance.bind();
-            m_programIrradiance.setUniform("uEnvMap", 0);
-
-            // Set layered true to use whole cube face
-            glBindImageTexture(0, irradianceCubemap.m_TextureID,
-                0, GL_TRUE, 0, GL_WRITE_ONLY, irradianceCubemap.m_Format);
-            glDispatchCompute((irradianceSize - 1) / localSize + 1, (irradianceSize - 1) / localSize + 1, 6);
-            glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        // 8. create a prefilter cubemap and allocate mips
-        GLsizei prefilterSize = 256;
-		prefilterCubemap.create(prefilterSize, prefilterSize, GL_TEXTURE_CUBE_MAP, GL_RGBA16F, 8);
-		prefilterCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-
-        // 9. run a quasi monte-carlo simulation on the environment lighting to create a prefilter cubemap
-        {
-            PROFILEGL("Prefilter cubemap");
-            glCopyImageSubData(
-                envCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 1, 0, 0, 0,
-                prefilterCubemap.m_TextureID, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
-                prefilterSize, prefilterSize, 6);
-
-            glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-            const int localSize = 16;
-            // Skip mipLevel 0
-            auto size = prefilterSize/2;
-            auto mipLevel = 1;
-            auto maxLevel = int(glm::floor(glm::log2(float(size))));
-            envCubemap.bind(0);
-            m_programPrefilter.bind();
-            m_programPrefilter.setUniform("uEnvMap", 0);
-            for (auto tsize = size; tsize > 0; tsize /= 2)
-            {
-                m_programPrefilter.setUniform("uRoughness", float(mipLevel) / maxLevel); 
-                // Set layered true to use whole cube face
-                glBindImageTexture(0, prefilterCubemap.m_TextureID, 
-                    mipLevel, GL_TRUE, 0, GL_WRITE_ONLY, prefilterCubemap.m_Format);
-                glDispatchCompute((tsize-1) / localSize + 1, (tsize-1) / localSize + 1, 6);
-                mipLevel++;
-            }
-            glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-        }
-
-        // 10. Generate a 2D LUT from the BRDF quation used.
-        uint32_t brdfSize = 512;
-    	brdfTexture.create(brdfSize, brdfSize, GL_TEXTURE_2D, GL_RG16F, 1);
-        // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
-		brdfTexture.parameter(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        brdfTexture.parameter(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        brdfTexture.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        brdfTexture.parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        // rescale capture framebuffer to brdf texture
-        glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, brdfSize, brdfSize);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfTexture.m_TextureID, 0);
-		m_programBrdf.bind();
-        glViewport(0, 0, brdfSize, brdfSize); 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        m_triangle.draw();
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	}
 
     void render()
     {    
@@ -925,9 +708,9 @@ namespace {
 		m_programSky.bind();
 
 		// Texture binding
-		envCubemap.bind(0);
-		irradianceCubemap.bind(1);
-		prefilterCubemap.bind(2);
+        m_lightProbe->getEnvCube()->bind(0);
+        m_lightProbe->getIrradiance()->bind(1);
+        m_lightProbe->getPrefilter()->bind(2);
 
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );
@@ -964,9 +747,9 @@ namespace {
     {
 		glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );
 
-		irradianceCubemap.bind(4);
-		prefilterCubemap.bind(5);
-		brdfTexture.bind(6);
+        m_lightProbe->getIrradiance()->bind(4);
+        m_lightProbe->getPrefilter()->bind(5);
+        light_probe::getBrdfLut()->bind(6);
 
         m_programMeshTex.bind();
 		// Uniform binding
@@ -1026,9 +809,10 @@ namespace {
     void renderTestCubeSample()
     {	
 		glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );  
-		irradianceCubemap.bind(4);
-		prefilterCubemap.bind(5);
-		brdfTexture.bind(6);
+
+        m_lightProbe->getIrradiance()->bind(4);
+        m_lightProbe->getPrefilter()->bind(5);
+        light_probe::getBrdfLut()->bind(6);
 
         m_programMesh.bind();
 		// Uniform binding
@@ -1075,7 +859,8 @@ namespace {
 
 	void prepareRender()
     {
-        updateLightProbe();
+        m_lightProbe = std::make_shared<LightProbe>();
+        m_lightProbe->create();
     }
 
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 

@@ -69,6 +69,22 @@ namespace {
     }
 }
 
+BaseTexturePtr BaseTexture::Create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels)
+{
+    auto tex = std::make_shared<BaseTexture>();
+    if (tex->create(width, height, target, format, levels))
+        return tex;
+    return nullptr;
+}
+
+BaseTexturePtr BaseTexture::Create(const std::string& filename)
+{
+    auto tex = std::make_shared<BaseTexture>();
+    if (tex->create(filename))
+        return tex;
+    return nullptr;
+}
+
 BaseTexture::BaseTexture() :
 	m_TextureID(0),
 	m_Target(GL_INVALID_ENUM),

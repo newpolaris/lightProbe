@@ -2,6 +2,7 @@
 
 #include <GL/glew.h>
 #include <string>
+#include <GraphicsTypes.h>
 
 class BaseTexture
 {
@@ -10,8 +11,11 @@ public:
 	BaseTexture();
     virtual ~BaseTexture();
 
-	bool create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels);
+    static BaseTexturePtr Create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels);
+    static BaseTexturePtr Create(const std::string& filename);
+
 	bool create(const std::string& filename);
+	bool create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels);
 	void destroy();
 	void bind(GLuint unit) const;
 	void unbind(GLuint unit) const;

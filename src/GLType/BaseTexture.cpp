@@ -103,14 +103,12 @@ BaseTexture::~BaseTexture()
 
 bool BaseTexture::create(GLint width, GLint height, GLenum target, GLenum format, GLuint levels)
 {
-	GLuint TextureName = 0;
-	glGenTextures(1, &TextureName);
-	glBindTexture(target, TextureName);
-	glTexStorage2D(target, levels, format, width, height);
-	glBindTexture(target, 0);
+	GLuint TextureID = 0;
+	glCreateTextures(target, 1, &TextureID);
+	glTextureStorage2D(TextureID, levels, format, width, height);
 
 	m_Target = target;
-	m_TextureID = TextureName;
+	m_TextureID = TextureID;
 	m_Format = format;
 	m_Width = width;
 	m_Height = height;
@@ -140,15 +138,14 @@ bool BaseTexture::createFromFileGLI(const std::string& filename)
 	gli::gl::format const Format = GL.translate(Texture.format(), Texture.swizzles());
 	GLenum Target = GL.translate(Texture.target());
 
-	GLuint TextureName = 0;
-	glGenTextures(1, &TextureName);
-	glBindTexture(Target, TextureName);
-	glTexParameteri(Target, GL_TEXTURE_BASE_LEVEL, 0);
-	glTexParameteri(Target, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(Texture.levels() - 1));
-	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_R, Format.Swizzles[0]);
-	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_G, Format.Swizzles[1]);
-	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_B, Format.Swizzles[2]);
-	glTexParameteri(Target, GL_TEXTURE_SWIZZLE_A, Format.Swizzles[3]);
+	GLuint TextureID = 0;
+	glCreateTextures(Target, 1, &TextureID);
+	glTextureParameteri(TextureID, GL_TEXTURE_BASE_LEVEL, 0);
+	glTextureParameteri(TextureID, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(Texture.levels() - 1));
+	glTextureParameteri(TextureID, GL_TEXTURE_SWIZZLE_R, Format.Swizzles[0]);
+	glTextureParameteri(TextureID, GL_TEXTURE_SWIZZLE_G, Format.Swizzles[1]);
+	glTextureParameteri(TextureID, GL_TEXTURE_SWIZZLE_B, Format.Swizzles[2]);
+	glTextureParameteri(TextureID, GL_TEXTURE_SWIZZLE_A, Format.Swizzles[3]);
 
 	glm::tvec3<GLsizei> const Extent(Texture.extent());
 	GLsizei const FaceTotal = static_cast<GLsizei>(Texture.layers() * Texture.faces());
@@ -156,21 +153,21 @@ bool BaseTexture::createFromFileGLI(const std::string& filename)
 	switch(Texture.target())
 	{
 	case gli::TARGET_1D:
-		glTexStorage1D(
-			Target, static_cast<GLint>(Texture.levels()), Format.Internal, Extent.x);
+		glTextureStorage1D(
+			TextureID, static_cast<GLint>(Texture.levels()), Format.Internal, Extent.x);
 		break;
 	case gli::TARGET_1D_ARRAY:
 	case gli::TARGET_2D:
 	case gli::TARGET_CUBE:
-		glTexStorage2D(
-			Target, static_cast<GLint>(Texture.levels()), Format.Internal,
+		glTextureStorage2D(
+			TextureID, static_cast<GLint>(Texture.levels()), Format.Internal,
 			Extent.x, Extent.y);
 		break;
 	case gli::TARGET_2D_ARRAY:
 	case gli::TARGET_3D:
 	case gli::TARGET_CUBE_ARRAY:
-		glTexStorage3D(
-			Target, static_cast<GLint>(Texture.levels()), Format.Internal,
+		glTextureStorage3D(
+			TextureID, static_cast<GLint>(Texture.levels()), Format.Internal,
 			Extent.x, Extent.y,
 			Texture.target() == gli::TARGET_3D ? Extent.z : FaceTotal);
 		break;
@@ -193,13 +190,13 @@ bool BaseTexture::createFromFileGLI(const std::string& filename)
 		{
 		case gli::TARGET_1D:
 			if(gli::is_compressed(Texture.format()))
-				glCompressedTexSubImage1D(
-					Target, static_cast<GLint>(Level), 0, Extent.x,
+				glCompressedTextureSubImage1D(
+					TextureID, static_cast<GLint>(Level), 0, Extent.x,
 					Format.Internal, static_cast<GLsizei>(Texture.size(Level)),
 					Texture.data(Layer, Face, Level));
 			else
-				glTexSubImage1D(
-					Target, static_cast<GLint>(Level), 0, Extent.x,
+				glTextureSubImage1D(
+					TextureID, static_cast<GLint>(Level), 0, Extent.x,
 					Format.External, Format.Type,
 					Texture.data(Layer, Face, Level));
 			break;
@@ -207,16 +204,16 @@ bool BaseTexture::createFromFileGLI(const std::string& filename)
 		case gli::TARGET_2D:
 		case gli::TARGET_CUBE:
 			if(gli::is_compressed(Texture.format()))
-				glCompressedTexSubImage2D(
-					Target, static_cast<GLint>(Level),
+				glCompressedTextureSubImage2D(
+					TextureID, static_cast<GLint>(Level),
 					0, 0,
 					Extent.x,
 					Texture.target() == gli::TARGET_1D_ARRAY ? LayerGL : Extent.y,
 					Format.Internal, static_cast<GLsizei>(Texture.size(Level)),
 					Texture.data(Layer, Face, Level));
 			else
-				glTexSubImage2D(
-					Target, static_cast<GLint>(Level),
+				glTextureSubImage2D(
+					TextureID, static_cast<GLint>(Level),
 					0, 0,
 					Extent.x,
 					Texture.target() == gli::TARGET_1D_ARRAY ? LayerGL : Extent.y,
@@ -227,16 +224,16 @@ bool BaseTexture::createFromFileGLI(const std::string& filename)
 		case gli::TARGET_3D:
 		case gli::TARGET_CUBE_ARRAY:
 			if(gli::is_compressed(Texture.format()))
-				glCompressedTexSubImage3D(
-					Target, static_cast<GLint>(Level),
+				glCompressedTextureSubImage3D(
+					TextureID, static_cast<GLint>(Level),
 					0, 0, 0,
 					Extent.x, Extent.y,
 					Texture.target() == gli::TARGET_3D ? Extent.z : LayerGL,
 					Format.Internal, static_cast<GLsizei>(Texture.size(Level)),
 					Texture.data(Layer, Face, Level));
 			else
-				glTexSubImage3D(
-					Target, static_cast<GLint>(Level),
+				glTextureSubImage3D(
+					TextureID, static_cast<GLint>(Level),
 					0, 0, 0,
 					Extent.x, Extent.y,
 					Texture.target() == gli::TARGET_3D ? Extent.z : LayerGL,
@@ -249,13 +246,13 @@ bool BaseTexture::createFromFileGLI(const std::string& filename)
 		}
 	}
 	m_Target = Target;
-	m_TextureID = TextureName;
+	m_TextureID = TextureID;
 	m_MipCount = static_cast<GLint>(Texture.levels());
 	m_Format = Format.Type;
 	m_Width = Extent.x;
 	m_Height = Extent.y;
 	m_Depth = Texture.target() == gli::TARGET_3D ? Extent.z : FaceTotal;
-	glBindTexture(Target, 0);
+
 	return true;
 }
 
@@ -283,24 +280,23 @@ bool BaseTexture::createFromFileSTB(const std::string& filename)
     GLenum Format = GetComponent(nrComponents);
     GLenum InternalFormat = GetInternalComponent(nrComponents, Type == GL_FLOAT);
 
-	GLuint TextureName = 0;
-	glGenTextures(1, &TextureName);
-	glBindTexture(Target, TextureName);
+	GLuint TextureID = 0;
+	glCreateTextures(Target, 1, &TextureID);
 
 	// Use fixed storage
-    glTexStorage2D(Target, 1, InternalFormat, Width, Height);
-    glTexSubImage2D(Target, 0, 0, 0, Width, Height, Format, Type, Data);
+    glTextureStorage2D(TextureID, 1, InternalFormat, Width, Height);
+    glTextureSubImage2D(TextureID, 0, 0, 0, Width, Height, Format, Type, Data);
 
     stbi_image_free(Data);
 
 	m_Target = Target;
-	m_TextureID = TextureName;
+	m_TextureID = TextureID;
 	m_Format = Type;
 	m_Width = Width;
 	m_Height = Height;
 	m_Depth = 1;
 	m_MipCount = 1;
-	glBindTexture(Target, 0);
+
 	return true;
 }
 
@@ -308,8 +304,14 @@ void BaseTexture::destroy()
 {
 	if (!m_TextureID)
 	{
-		glDeleteTextures( 1, &m_TextureID);
+		glDeleteTextures(1, &m_TextureID);
 		m_TextureID = 0;
+
+        m_Format = GL_INVALID_ENUM;
+        m_Width = 0;
+        m_Height = 0;
+        m_Depth = 0;
+        m_MipCount = 0;
 	}
 	m_Target = GL_INVALID_ENUM;
 }
@@ -317,14 +319,12 @@ void BaseTexture::destroy()
 void BaseTexture::bind(GLuint unit) const
 {
 	assert( 0u != m_TextureID );  
-	glActiveTexture(GL_TEXTURE0 + unit);
-	glBindTexture(m_Target, m_TextureID);
+    glBindTextureUnit(unit, m_TextureID);
 }
 
 void BaseTexture::unbind(GLuint unit) const
 {
-	glActiveTexture(GL_TEXTURE0 + unit);
-	glBindTexture(m_Target, 0u);
+    glBindTextureUnit(unit, 0);
 }
 
 void BaseTexture::generateMipmap()
@@ -332,9 +332,7 @@ void BaseTexture::generateMipmap()
 	assert(m_Target != GL_INVALID_ENUM);
 	assert(m_TextureID != 0);
 
-	glBindTexture(m_Target, m_TextureID);
-	glGenerateMipmap(m_Target);
-	glBindTexture(m_Target, 0u);
+	glGenerateTextureMipmap(m_TextureID);
 }
 
 void BaseTexture::parameter(GLenum pname, GLint param)

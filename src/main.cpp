@@ -30,6 +30,7 @@
 #include <tools/Timer.hpp>
 #include <tools/Logger.hpp>
 #include <tools/gltools.hpp>
+#include <tools/SimpleProfile.h>
 
 #include <GLType/ProgramShader.h>
 #include <GLType/BaseTexture.h>
@@ -387,6 +388,16 @@ namespace {
         }
 
         fprintf( stderr, "GLEW version : %s\n", glewGetString(GLEW_VERSION));
+
+        assert(GLEW_ARB_direct_state_access);
+
+        /*
+        if(!GLEW_ARB_direct_state_access)
+        {
+            this->getDevice()->downcast<OGLDevice>()->message("Can't support direct state access");
+            return false;
+        }
+        */
 	}
 
 	void initGL()
@@ -446,7 +457,7 @@ namespace {
         glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
     #endif
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		
@@ -860,7 +871,11 @@ namespace {
 	void prepareRender()
     {
         m_lightProbe = std::make_shared<LightProbe>();
-        m_lightProbe->create();
+        m_lightProbe->initialize();
+        {
+        PROFILEGL("Light Probe");
+        m_lightProbe->update();
+        }
     }
 
     void glfw_keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods) 

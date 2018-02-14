@@ -13,7 +13,11 @@ class LightProbe
 {
 public:
 
-    bool create();
+    bool initialize();
+    bool update();
+    void draw();
+    void destroy();
+    ~LightProbe();
 
     BaseTexturePtr getEnvCube();
     BaseTexturePtr getIrradiance();
@@ -21,9 +25,17 @@ public:
 
 private:
 
-    BaseTexturePtr createEnvCube();
-    BaseTexturePtr createIrradiance(const BaseTexturePtr& envMap);
-    BaseTexturePtr createPrefilter(const BaseTexturePtr& envMap);
+    void createEnvCube();
+    void createIrradiance(const BaseTexturePtr& envMap);
+    void createPrefilter(const BaseTexturePtr& envMap);
+
+    const uint32_t m_MipmapLevels = 8;
+    const uint32_t m_envMapSize = 512;
+    const uint32_t m_irradianceSize = 16;
+    const uint32_t m_prefilterSize = 256;
+
+    unsigned int m_captureFBO = 0;
+    unsigned int m_captureRBO = 0;
 
     BaseTexturePtr m_envCubemap;
     BaseTexturePtr m_irradianceCubemap;

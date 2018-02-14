@@ -161,7 +161,9 @@ namespace
     ProgramShader m_programMesh;
     ProgramShader m_programMeshTex;
     ProgramShader m_programSky;
+    ProgramShader m_programIrradiance;
     ProgramShader m_programPrefilter;
+    ProgramShader m_programBrdf;
     BaseTexture m_pistolTex[4];
 	BaseTexture m_pbrTex[5][4];
     SphereMesh m_sphere( 48, 5.0f );
@@ -409,9 +411,18 @@ namespace {
         m_programSky.addShader(GL_FRAGMENT_SHADER, "IblSkyBox.Fragment");
         m_programSky.link();  
 
+        m_programIrradiance.initalize();
+        m_programIrradiance.addShader(GL_COMPUTE_SHADER, "Irradiance.Compute");
+        m_programIrradiance.link();  
+
         m_programPrefilter.initalize();
         m_programPrefilter.addShader(GL_COMPUTE_SHADER, "Radiance.Compute");
         m_programPrefilter.link();
+
+        m_programBrdf.initalize();
+        m_programBrdf.addShader(GL_VERTEX_SHADER, "Brdf.Vertex");
+        m_programBrdf.addShader(GL_FRAGMENT_SHADER, "Brdf.Fragment");
+        m_programBrdf.link();  
 
 		// to prevent osx input bug
 		fflush(stdout);
@@ -748,15 +759,16 @@ namespace {
     void updateLightProbe()
 	{
 		// 1. setup framebuffer
-		unsigned int captureFBO;
-		unsigned int captureRBO;
+		unsigned int captureFBO = 0;
+		unsigned int captureRBO = 0;
+        uint32_t envMapSize = 512;
 
 		glGenFramebuffers(1, &captureFBO);
 		glGenRenderbuffers(1, &captureRBO);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 		glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, envMapSize, envMapSize);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
 		// 2. load the HDR environment map
@@ -770,7 +782,8 @@ namespace {
 		newportTex.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 3. setup cubemap to render to and attach to framebuffer
-		envCubemap.create(512, 512, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 7);
+        const uint32_t MipmapLevels = 8;
+		envCubemap.create(envMapSize, envMapSize, GL_TEXTURE_CUBE_MAP, GL_RGB16F, 8);
 		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		// 4. set up projection and view matrices for capturing data onto the 6 cubemap face directions
@@ -797,7 +810,8 @@ namespace {
 
         newportTex.bind(0);
 
-		glViewport(0, 0, 512, 512); // don't forget to configure the viewport to the capture dimensions.
+        // don't forget to configure the viewport to the capture dimensions.
+		glViewport(0, 0, envMapSize, envMapSize); 
 		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 		for (unsigned int i = 0; i < 6; ++i)
 		{
@@ -813,28 +827,21 @@ namespace {
 		envCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		envCubemap.generateMipmap();
 
-        // 6. create an irradiance cubemap, and re-scale capture FBO to irradiance scale.
-        uint32_t irradianceSize = 32;
+        // 6. create an irradiance cubemap
+        uint32_t irradianceSize = 16;
 		irradianceCubemap.create(irradianceSize, irradianceSize, GL_TEXTURE_CUBE_MAP, GL_RGBA16F, 1);
 		irradianceCubemap.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR); 
 
-		glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, irradianceSize, irradianceSize);
-
         // 7. solve diffuse integral by convolution to create an irradiance cbuemap
-        ProgramShader programIrradiance;
-        programIrradiance.initalize();
-        programIrradiance.addShader(GL_COMPUTE_SHADER, "Irradiance.Compute");
-        programIrradiance.link();  
 		envCubemap.bind(0);
         {
             PROFILEGL("Irradiance cubemap");
             const int localSize = 16;
             glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
             envCubemap.bind(0);
-            m_programPrefilter.bind();
-            m_programPrefilter.setUniform("uEnvMap", 0);
+            m_programIrradiance.bind();
+            m_programIrradiance.setUniform("uEnvMap", 0);
+
             // Set layered true to use whole cube face
             glBindImageTexture(0, irradianceCubemap.m_TextureID,
                 0, GL_TRUE, 0, GL_WRITE_ONLY, irradianceCubemap.m_Format);
@@ -878,7 +885,8 @@ namespace {
         }
 
         // 10. Generate a 2D LUT from the BRDF quation used.
-    	brdfTexture.create(512, 512, GL_TEXTURE_2D, GL_RG16F, 1);
+        uint32_t brdfSize = 512;
+    	brdfTexture.create(brdfSize, brdfSize, GL_TEXTURE_2D, GL_RG16F, 1);
         // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
 		brdfTexture.parameter(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         brdfTexture.parameter(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -888,16 +896,10 @@ namespace {
         // rescale capture framebuffer to brdf texture
         glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
         glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, brdfSize, brdfSize);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfTexture.m_TextureID, 0);
-
-        ProgramShader programBrdf;
-        programBrdf.initalize();
-        programBrdf.addShader(GL_VERTEX_SHADER, "Brdf.Vertex");
-        programBrdf.addShader(GL_FRAGMENT_SHADER, "Brdf.Fragment");
-        programBrdf.link();  
-		programBrdf.bind();
-        glViewport(0, 0, 512, 512); 
+		m_programBrdf.bind();
+        glViewport(0, 0, brdfSize, brdfSize); 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_triangle.draw();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -925,8 +927,7 @@ namespace {
 		// Texture binding
 		envCubemap.bind(0);
 		irradianceCubemap.bind(1);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterCubemap.m_TextureID);
+		prefilterCubemap.bind(2);
 
 		m_programSky.setUniform( "uEnvmap", 0 );
 		m_programSky.setUniform( "uEnvmapIrr", 1 );

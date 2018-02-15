@@ -18,6 +18,7 @@
 
 #include "ProgramShader.h"
 
+char* ProgramShader::incPaths[] = { "/" };
 
 void ProgramShader::initalize()
 {
@@ -39,7 +40,6 @@ void ProgramShader::destroy()
     }
 }
 
-
 void ProgramShader::addShader(GLenum shaderType, const std::string &tag)
 {
     if(glswGetError() != 0) {
@@ -53,7 +53,6 @@ void ProgramShader::addShader(GLenum shaderType, const std::string &tag)
 
     if(0 == source)
     {
-        //Logger::getInstance().write( "Error : shader \"%s\" not found, check your directory.\n", cTag);
         fprintf(stderr, "Error : shader \"%s\" not found, check your directory.\n", cTag);
         fprintf(stderr, "Execution terminated.\n");
         exit(EXIT_FAILURE);
@@ -61,8 +60,9 @@ void ProgramShader::addShader(GLenum shaderType, const std::string &tag)
 
     GLuint shader = glCreateShader(shaderType);
     glShaderSource(shader, 1, (const GLchar**)&source, 0);
-    glCompileShader(shader);
-
+    // NOTE: had some issues using include paths with 
+    // https://www.opengl.org/registry/specs/ARB/shading_language_include.txt
+    glCompileShaderIncludeARB(shader, 1, incPaths, NULL);
 
     GLint status = 0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
@@ -219,4 +219,38 @@ bool ProgramShader::bindImage(const std::string &name, const BaseTexturePtr &tex
     glUniform1i(loc, unit);
 
     return true;
+}
+
+bool ProgramShader::setIncludeFromFile(const std::string &includeName, const std::string &filename)
+{
+    auto incStr = readTextFile(filename);
+    if(incStr.size() == 0)
+        return false;
+    glNamedStringARB(GL_SHADER_INCLUDE_ARB, includeName.size(), includeName.c_str(), incStr.size(), incStr.data());
+    return false;
+}
+
+std::vector<char> ProgramShader::readTextFile(const std::string &filename)
+{
+    if (filename.empty()) 
+        return std::vector<char>();
+
+	FILE *fp = 0;
+	if (!(fp = fopen(filename.c_str(), "r")))
+	{
+		printf("Cannot open \"%s\" for read!\n", filename.c_str());
+		return std::vector<char>();
+	}
+
+    fseek(fp, 0L, SEEK_END);     // seek to end of file
+    long size = ftell(fp);       // get file length
+    rewind(fp);                  // rewind to start of file
+
+    std::vector<char> buffer(size);
+
+	size_t bytes;
+	bytes = fread(buffer.data(), 1, size, fp);
+
+	fclose(fp);
+	return buffer;
 }

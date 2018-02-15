@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <GraphicsTypes.h>
+#include <vector>
 
 class ProgramShader
 {
@@ -38,10 +39,13 @@ public:
     bool setUniform(const std::string &name, const glm::mat4 &v) const;
 
     bool bindTexture(const std::string &name, const BaseTexturePtr& texture, GLint unit);
-    bool bindImage(const BaseTexturePtr &texture, GLint unit, GLint level, GLboolean layered, GLint layer, GLenum access);
     bool bindImage(const std::string &name, const BaseTexturePtr &texture, GLint unit, GLint level, GLboolean layered, GLint layer, GLenum access);
   
+    static bool setIncludeFromFile(const std::string &includeName, const std::string &filename);
+    static std::vector<char> readTextFile(const std::string &filename);
+
 protected:
 
+    static char* incPaths[];
     GLuint m_id;
 };

@@ -301,6 +301,7 @@ namespace {
 		glswInit();
 		glswSetPath("./shaders/", ".glsl");
 		glswAddDirectiveToken("*", "#version 440 core");
+		glswAddDirectiveToken("*", "#extension GL_ARB_shading_language_include : enable");
 
         Timer::getInstance().start();
 
@@ -390,6 +391,7 @@ namespace {
         fprintf( stderr, "GLEW version : %s\n", glewGetString(GLEW_VERSION));
 
         assert(GLEW_ARB_direct_state_access);
+        assert(GLEW_ARB_shading_language_include);
 
         /*
         if(!GLEW_ARB_direct_state_access)
@@ -540,7 +542,6 @@ namespace {
 	{
         Timer::getInstance().update();
         camera.update();
-        // app.update();
 		updateHUD();
 	}
 

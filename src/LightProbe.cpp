@@ -46,6 +46,8 @@ void light_probe::initialize()
     s_programPrefilter.addShader(GL_COMPUTE_SHADER, "Radiance.Compute");
     s_programPrefilter.link();
 
+    ProgramShader::setIncludeFromFile("/Sampling.glsli", "./shaders/Sampling.glsli");
+
     s_programBrdf.initalize();
     s_programBrdf.addShader(GL_VERTEX_SHADER, "Brdf.Vertex");
     s_programBrdf.addShader(GL_FRAGMENT_SHADER, "Brdf.Fragment");

@@ -30,7 +30,6 @@ endif(INCLUDE_DISTRIB)
 include_directories(
 	src/
 	external/
-	external/FreeImage/src/
 	external/AntTweakBar-1.16/include/
 	external/glfw-3.1.2/include/GLFW/
 	external/glm/
@@ -45,7 +44,6 @@ set(ALL_LIBS
 	${OPENGL_LIBRARY}
 	glfw
 	GLEW_1130
-	FreeImage
 	imgui
 	assimp
 	gli

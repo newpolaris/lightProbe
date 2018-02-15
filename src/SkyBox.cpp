@@ -13,7 +13,6 @@
 #include <tools/gltools.hpp>
 #include <tools/Timer.hpp>
 #include <GLType/ProgramShader.h>
-#include <GLType/Texture.h>
 #include <GLType/BaseTexture.h>
 #include "Mesh.h"
 #include "SkyBox.h"

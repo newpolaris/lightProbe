@@ -183,7 +183,9 @@ if(UseBullet)
 endif(UseBullet)
 
 ### FreeImage ###
-add_subdirectory(FreeImage)
+if (UseFreeImage)
+	add_subdirectory(FreeImage)
+endif(UseFreeImage)
 
 ### ImGUI ###
 add_subdirectory(ImGUI)

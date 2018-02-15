@@ -60,7 +60,7 @@ void light_probe::initialize()
 
     s_brdfTexture = createBrdfLutTexture();
 
-    // 2. load the HDR environment map
+    // load the HDR environment map
     s_newportTex.create("resource/newport_loft.hdr");
     s_newportTex.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
@@ -84,7 +84,7 @@ BaseTexturePtr light_probe::getBrdfLut()
 
 BaseTexturePtr light_probe::createBrdfLutTexture()
 {
-    // 10. Generate a 2D LUT from the BRDF quation used.
+    // Generate a 2D LUT from the BRDF quation used.
     auto tex = BaseTexture::Create(s_brdfSize, s_brdfSize, GL_TEXTURE_2D, GL_RG16F, 1);
     if (!tex) return nullptr;
 
@@ -219,8 +219,7 @@ void LightProbe::createIrradiance(const BaseTexturePtr& envMap)
     s_programIrradiance.setUniform("uEnvMap", 0);
 
     // Set layered true to use whole cube face
-    glBindImageTexture(0, m_irradianceCubemap->m_TextureID,
-        0, GL_TRUE, 0, GL_WRITE_ONLY, m_irradianceCubemap->m_Format);
+    s_programIrradiance.bindImage("uCube", m_irradianceCubemap, 0, 0, GL_TRUE, 0, GL_WRITE_ONLY);
     glDispatchCompute((m_irradianceSize - 1) / localSize + 1, (m_irradianceSize - 1) / localSize + 1, 6);
 }
 
@@ -244,8 +243,7 @@ void LightProbe::createPrefilter(const BaseTexturePtr& envMap)
     {
         s_programPrefilter.setUniform("uRoughness", float(mipLevel) / maxLevel);
         // Set layered true to use whole cube face
-        glBindImageTexture(0, m_prefilterCubemap->m_TextureID,
-            mipLevel, GL_TRUE, 0, GL_WRITE_ONLY, m_prefilterCubemap->m_Format);
+        s_programPrefilter.bindImage("uCube", m_prefilterCubemap, 0, mipLevel, GL_TRUE, 0, GL_WRITE_ONLY);
         glDispatchCompute((tsize - 1) / localSize + 1, (tsize - 1) / localSize + 1, 6);
         mipLevel++;
     }

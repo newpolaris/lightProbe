@@ -719,13 +719,9 @@ namespace {
 		m_programSky.bind();
 
 		// Texture binding
-        m_lightProbe->getEnvCube()->bind(0);
-        m_lightProbe->getIrradiance()->bind(1);
-        m_lightProbe->getPrefilter()->bind(2);
-
-		m_programSky.setUniform( "uEnvmap", 0 );
-		m_programSky.setUniform( "uEnvmapIrr", 1 );
-		m_programSky.setUniform( "uEnvmapPrefilter", 2 );
+		m_programSky.bindTexture( "uEnvmap", m_lightProbe->getEnvCube(), 0 );
+		m_programSky.bindTexture( "uEnvmapIrr", m_lightProbe->getIrradiance(), 1 );
+		m_programSky.bindTexture( "uEnvmapPrefilter", m_lightProbe->getPrefilter(), 2 );
 
 		// Uniform binding
         m_programSky.setUniform( "uViewMatrix", camera.getViewMatrix() );
@@ -758,11 +754,8 @@ namespace {
     {
 		glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );
 
-        m_lightProbe->getIrradiance()->bind(4);
-        m_lightProbe->getPrefilter()->bind(5);
-        light_probe::getBrdfLut()->bind(6);
-
         m_programMeshTex.bind();
+
 		// Uniform binding
         m_programMeshTex.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programMeshTex.setUniform( "uEyePosWS", camera.getPosition());
@@ -779,9 +772,10 @@ namespace {
 		}
 
 		// Texture binding
-		m_programMeshTex.setUniform( "uEnvmapIrr", 4 );
-		m_programMeshTex.setUniform( "uEnvmapPrefilter", 5 );
-		m_programMeshTex.setUniform( "uEnvmapBrdfLUT", 6 );
+		m_programMeshTex.bindTexture( "uEnvmapIrr", m_lightProbe->getIrradiance(), 4 );
+		m_programMeshTex.bindTexture( "uEnvmapPrefilter", m_lightProbe->getPrefilter(), 5 );
+		m_programMeshTex.bindTexture( "uEnvmapBrdfLUT", light_probe::getBrdfLut(), 6 );
+
 		m_programMeshTex.setUniform( "uAlbedoMap", 0 );
 		m_programMeshTex.setUniform( "uNormalMap", 1 );
 		m_programMeshTex.setUniform( "uMetallicMap", 2 );
@@ -821,11 +815,8 @@ namespace {
     {	
 		glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );  
 
-        m_lightProbe->getIrradiance()->bind(4);
-        m_lightProbe->getPrefilter()->bind(5);
-        light_probe::getBrdfLut()->bind(6);
-
         m_programMesh.bind();
+
 		// Uniform binding
         m_programMesh.setUniform( "uModelViewProjMatrix", camera.getViewProjMatrix() );
 		m_programMesh.setUniform( "uEyePosWS", camera.getPosition());
@@ -840,9 +831,9 @@ namespace {
 		m_programMesh.setUniform( "uMtxSrt", glm::mat4(1) );
 
 		// Texture binding
-		m_programMesh.setUniform( "uEnvmapIrr", 4 );
-		m_programMesh.setUniform( "uEnvmapPrefilter", 5 );
-		m_programMesh.setUniform( "uEnvmapBrdfLUT", 6 );
+		m_programMesh.bindTexture( "uEnvmapIrr", m_lightProbe->getIrradiance(), 4 );
+		m_programMesh.bindTexture( "uEnvmapPrefilter", m_lightProbe->getPrefilter(), 5 );
+		m_programMesh.bindTexture( "uEnvmapBrdfLUT", light_probe::getBrdfLut(), 6 );
 
         // Submit orbs.
         for (float yy = 0, yend = 5.0f; yy < yend; yy+=1.0f)

@@ -36,6 +36,8 @@ void main()
 
 -- Fragment
 
+#include "ToneMappingUtility.glsli"
+
 // IN
 in vec3 vDirection;
 
@@ -48,43 +50,6 @@ uniform samplerCube uEnvmapIrr;
 uniform samplerCube uEnvmapPrefilter;
 uniform float uBgType;
 uniform float uExposure;
-
-vec3 toLinear(vec3 _rgb)
-{
-	return pow(abs(_rgb), vec3(2.2) );
-}
-
-vec4 toLinear(vec4 _rgba)
-{
-	return vec4(toLinear(_rgba.xyz), _rgba.w);
-}
-
-float toGamma(float _r)
-{
-	return pow(abs(_r), 1.0/2.2);
-}
-
-vec3 toGamma(vec3 _rgb)
-{
-	return pow(abs(_rgb), vec3(1.0/2.2) );
-}
-
-vec4 toGamma(vec4 _rgba)
-{
-	return vec4(toGamma(_rgba.xyz), _rgba.w);
-}
-
-vec3 toFilmic(vec3 _rgb)
-{
-  _rgb = max(vec3(0.0), _rgb - 0.004);
-  _rgb = (_rgb*(6.2*_rgb + 0.5) ) / (_rgb*(6.2*_rgb + 1.7) + 0.06);
-  return _rgb;
-}
-
-vec4 toFilmic(vec4 _rgba)
-{
-  return vec4(toFilmic(_rgba.xyz), _rgba.w);
-}
 
 vec3 fixCubeLookup(vec3 _v, float _lod, float _topLevelCubeSize)
 {

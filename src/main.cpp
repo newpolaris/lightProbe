@@ -301,7 +301,6 @@ namespace {
 		glswInit();
 		glswSetPath("./shaders/", ".glsl");
 		glswAddDirectiveToken("*", "#version 440 core");
-		glswAddDirectiveToken("*", "#extension GL_ARB_shading_language_include : enable");
 
         Timer::getInstance().start();
 

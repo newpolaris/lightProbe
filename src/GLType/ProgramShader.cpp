@@ -15,6 +15,7 @@
 #include <tools/gltools.hpp>
 #include <tools/Logger.hpp>
 #include <GLType/BaseTexture.h>
+#include <GLType/ProgramManager.h>
 
 #include "ProgramShader.h"
 
@@ -58,11 +59,17 @@ void ProgramShader::addShader(GLenum shaderType, const std::string &tag)
         exit(EXIT_FAILURE);
     }
 
+    // HACK
+    static nv_helpers_gl::IncludeRegistry m_includes;
+    static std::vector<std::string> directory = { ".", "./shaders" };
+    std::string content(source);
+    std::string preprocessed = nv_helpers_gl::manualInclude(tag, content, "", directory, m_includes);
+    char const* sourcePointer = preprocessed.c_str();
     GLuint shader = glCreateShader(shaderType);
-    glShaderSource(shader, 1, (const GLchar**)&source, 0);
+    glShaderSource(shader, 1, &sourcePointer, 0);
     // NOTE: had some issues using include paths with 
     // https://www.opengl.org/registry/specs/ARB/shading_language_include.txt
-    glCompileShaderIncludeARB(shader, 1, incPaths, NULL);
+    glCompileShader(shader);
 
     GLint status = 0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &status);

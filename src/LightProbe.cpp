@@ -15,7 +15,7 @@ namespace light_probe
 {
     const uint32_t s_brdfSize = 512;
 
-    BaseTexture s_newportTex;
+    BaseTexturePtr s_newportTex;
     BaseTexturePtr s_brdfTexture;
 
     ProgramShader s_equirectangularToCubemapShader;
@@ -54,8 +54,8 @@ void light_probe::initialize()
     s_brdfTexture = createBrdfLutTexture();
 
     // load the HDR environment map
-    s_newportTex.create("resource/newport_loft.hdr");
-    s_newportTex.parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    s_newportTex = BaseTexture::Create("resource/newport_loft.hdr");
+    s_newportTex->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
 
 void light_probe::shutdown()
@@ -123,10 +123,13 @@ bool LightProbe::initialize()
 bool LightProbe::update()
 {
     createEnvCube();
-    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-    createIrradiance(m_envCubemap);
-    createPrefilter(m_envCubemap);
-    glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    {
+        PROFILEGL("Prefiltering");
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+        createIrradiance(m_envCubemap);
+        createPrefilter(m_envCubemap);
+        glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    }
 
     return true;
 }
@@ -160,11 +163,9 @@ void LightProbe::createEnvCube()
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f))
     };
 
-    // convert HDR equirectangular environment map to cubemap equivalent
-    s_newportTex.bind(0);
-
     s_equirectangularToCubemapShader.bind();
-    s_equirectangularToCubemapShader.setUniform("equirectangularMap", 0);
+    // convert HDR equirectangular environment map to cubemap equivalent
+    s_equirectangularToCubemapShader.bindTexture("equirectangularMap", s_newportTex, 0);
     s_equirectangularToCubemapShader.setUniform("projection", captureProjection);
 
     assert(m_captureFBO != 0);

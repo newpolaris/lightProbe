@@ -940,7 +940,7 @@ namespace {
 			glfwGetCursorPos(window, &xpos, &ypos);
 			const bool mouseOverGui = ImGui::MouseOverArea();
 			if (!mouseOverGui)
-				camera.motionHandler( xpos, ypos, true); 
+				camera.motionHandler( int(xpos), int(ypos), true); 
 		}    
     }
 

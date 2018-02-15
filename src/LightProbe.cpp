@@ -13,8 +13,6 @@ using namespace light_probe;
 
 namespace light_probe
 {
-    unsigned int s_captureFBO = 0;
-    unsigned int s_captureRBO = 0;
     const uint32_t s_brdfSize = 512;
 
     BaseTexture s_newportTex;
@@ -23,7 +21,7 @@ namespace light_probe
     ProgramShader s_equirectangularToCubemapShader;
     ProgramShader s_programIrradiance;
     ProgramShader s_programPrefilter;
-    ProgramShader s_programBrdf;
+    ProgramShader s_programBrdfLut;
 
     FullscreenTriangleMesh s_triangle;
     CubeMesh s_cube;
@@ -46,17 +44,12 @@ void light_probe::initialize()
     s_programPrefilter.addShader(GL_COMPUTE_SHADER, "Radiance.Compute");
     s_programPrefilter.link();
 
-    s_programBrdf.initalize();
-    s_programBrdf.addShader(GL_VERTEX_SHADER, "Brdf.Vertex");
-    s_programBrdf.addShader(GL_FRAGMENT_SHADER, "Brdf.Fragment");
-    s_programBrdf.link();
+    s_programBrdfLut.initalize();
+    s_programBrdfLut.addShader(GL_COMPUTE_SHADER, "BrdfLut.Compute");
+    s_programBrdfLut.link();
 
     s_triangle.init();
     s_cube.init();
-
-    // generate frame buffers
-    glCreateFramebuffers(1, &s_captureFBO);
-    glCreateRenderbuffers(1, &s_captureRBO);
 
     s_brdfTexture = createBrdfLutTexture();
 
@@ -67,11 +60,6 @@ void light_probe::initialize()
 
 void light_probe::shutdown()
 {
-    glDeleteFramebuffers(1, &s_captureFBO);
-    glDeleteRenderbuffers(1, &s_captureRBO);
-    s_captureFBO = 0;
-    s_captureRBO = 0;
-
     s_cube.destroy();
     s_triangle.destroy();
 }
@@ -94,21 +82,11 @@ BaseTexturePtr light_probe::createBrdfLutTexture()
     tex->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     tex->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // rescale capture framebuffer to brdf texture
-    assert(s_captureFBO != 0);
-    assert(s_captureRBO != 0);
-    glNamedFramebufferTexture(s_captureFBO, GL_COLOR_ATTACHMENT0, tex->m_TextureID, 0);
-    glNamedRenderbufferStorage(s_captureRBO, GL_DEPTH_COMPONENT24, s_brdfSize, s_brdfSize);
-    glNamedFramebufferRenderbuffer(s_captureFBO, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, s_captureRBO);
-    GLuint status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	assert(status == GL_FRAMEBUFFER_COMPLETE);
-    s_programBrdf.bind();
-
-    glBindFramebuffer(GL_FRAMEBUFFER, s_captureFBO);
-    glViewport(0, 0, s_brdfSize, s_brdfSize);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    s_triangle.draw();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // solve diffuse integral by convolution to create an irradiance cbuemap
+    const int localSize = 16;
+    s_programBrdfLut.bind();
+    s_programBrdfLut.bindImage("uLUT", tex, 0, 0, GL_TRUE, 0, GL_WRITE_ONLY);
+    s_programBrdfLut.Dispatch2D(s_brdfSize, s_brdfSize, localSize, localSize);
 
     return tex;
 }
@@ -129,12 +107,13 @@ bool LightProbe::initialize()
     if (!m_prefilterCubemap) return false;
     m_prefilterCubemap->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
+    // For Env caputer
     glCreateFramebuffers(1, &m_captureFBO);
     glCreateRenderbuffers(1, &m_captureRBO);
 
-    glNamedFramebufferTexture(s_captureFBO, GL_COLOR_ATTACHMENT0, m_envCubemap->m_TextureID, 0);
-    glNamedRenderbufferStorage(m_captureRBO, GL_DEPTH_COMPONENT24, s_brdfSize, s_brdfSize);
-    glNamedFramebufferRenderbuffer(s_captureFBO, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_captureRBO);
+    glNamedFramebufferTexture(m_captureFBO, GL_COLOR_ATTACHMENT0, m_envCubemap->m_TextureID, 0);
+    glNamedRenderbufferStorage(m_captureRBO, GL_DEPTH_COMPONENT24, m_envMapSize, m_envMapSize);
+    glNamedFramebufferRenderbuffer(m_captureFBO, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_captureRBO);
     GLuint status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	assert(status == GL_FRAMEBUFFER_COMPLETE);
 
@@ -214,13 +193,12 @@ void LightProbe::createIrradiance(const BaseTexturePtr& envMap)
 {
     // solve diffuse integral by convolution to create an irradiance cbuemap
     const int localSize = 16;
-    envMap->bind(0);
     s_programIrradiance.bind();
-    s_programIrradiance.setUniform("uEnvMap", 0);
+    s_programIrradiance.bindTexture("uEnvMap", envMap, 0);
 
     // Set layered true to use whole cube face
     s_programIrradiance.bindImage("uCube", m_irradianceCubemap, 0, 0, GL_TRUE, 0, GL_WRITE_ONLY);
-    glDispatchCompute((m_irradianceSize - 1) / localSize + 1, (m_irradianceSize - 1) / localSize + 1, 6);
+    s_programIrradiance.Dispatch3D(m_irradianceSize, m_irradianceSize, 6, localSize, localSize, 1);
 }
 
 void LightProbe::createPrefilter(const BaseTexturePtr& envMap)
@@ -236,15 +214,15 @@ void LightProbe::createPrefilter(const BaseTexturePtr& envMap)
     auto size = m_prefilterSize / 2;
     auto mipLevel = 1;
     auto maxLevel = int(glm::floor(glm::log2(float(size))));
-    envMap->bind(0);
+
     s_programPrefilter.bind();
-    s_programPrefilter.setUniform("uEnvMap", 0);
+    s_programPrefilter.bindTexture("uEnvMap", envMap, 0);
     for (auto tsize = size; tsize > 0; tsize /= 2)
     {
         s_programPrefilter.setUniform("uRoughness", float(mipLevel) / maxLevel);
         // Set layered true to use whole cube face
         s_programPrefilter.bindImage("uCube", m_prefilterCubemap, 0, mipLevel, GL_TRUE, 0, GL_WRITE_ONLY);
-        glDispatchCompute((tsize - 1) / localSize + 1, (tsize - 1) / localSize + 1, 6);
+        s_programPrefilter.Dispatch3D(tsize, tsize, 6, localSize, localSize, 1);
         mipLevel++;
     }
 }

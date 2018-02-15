@@ -19,7 +19,7 @@
 
 #include "ProgramShader.h"
 
-char* ProgramShader::incPaths[] = { "/" };
+static std::vector<std::string> directory = { ".", "./shaders" };
 
 void ProgramShader::initalize()
 {
@@ -62,8 +62,8 @@ void ProgramShader::addShader(GLenum shaderType, const std::string &tag)
     // HACK
     static nv_helpers_gl::IncludeRegistry m_includes;
     static std::vector<std::string> directory = { ".", "./shaders" };
-    std::string content(source);
-    std::string preprocessed = nv_helpers_gl::manualInclude(tag, content, "", directory, m_includes);
+    const std::string content(source);
+    const std::string preprocessed = nv_helpers_gl::manualInclude(tag, content, "", directory, m_includes);
     char const* sourcePointer = preprocessed.c_str();
     GLuint shader = glCreateShader(shaderType);
     glShaderSource(shader, 1, &sourcePointer, 0);

@@ -7,6 +7,7 @@
 #include <Mesh.h>
 #include <GLType/BaseTexture.h>
 #include <GLType/ProgramShader.h>
+#include <GLType/Framebuffer.h>
 #include <tools/SimpleProfile.h>
 
 using namespace light_probe;
@@ -93,10 +94,6 @@ BaseTexturePtr light_probe::createBrdfLutTexture()
 
 bool LightProbe::initialize()
 {
-    m_envCubemap = BaseTexture::Create(m_envMapSize, m_envMapSize, GL_TEXTURE_CUBE_MAP, GL_RGB16F, m_MipmapLevels);
-    if (!m_envCubemap) return false;
-    m_envCubemap->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
     // create an irradiance cubemap
     m_irradianceCubemap = BaseTexture::Create(m_irradianceSize, m_irradianceSize, GL_TEXTURE_CUBE_MAP, GL_RGBA16F, 1);
     if (!m_irradianceCubemap) return false;
@@ -107,15 +104,17 @@ bool LightProbe::initialize()
     if (!m_prefilterCubemap) return false;
     m_prefilterCubemap->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
-    // For Env caputer
-    glCreateFramebuffers(1, &m_captureFBO);
-    glCreateRenderbuffers(1, &m_captureRBO);
+    // For Env capture
+    m_envCubemap = BaseTexture::Create(m_envMapSize, m_envMapSize, GL_TEXTURE_CUBE_MAP, GL_RGB16F, m_MipmapLevels);
+    if (!m_envCubemap) return false;
+    m_envCubemap->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    glNamedFramebufferTexture(m_captureFBO, GL_COLOR_ATTACHMENT0, m_envCubemap->m_TextureID, 0);
-    glNamedRenderbufferStorage(m_captureRBO, GL_DEPTH_COMPONENT24, m_envMapSize, m_envMapSize);
-    glNamedFramebufferRenderbuffer(m_captureFBO, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_captureRBO);
-    GLuint status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	assert(status == GL_FRAMEBUFFER_COMPLETE);
+    auto depth = BaseTexture::Create(m_envMapSize, m_envMapSize, GL_TEXTURE_2D, GL_DEPTH_COMPONENT24, 1);
+
+    FramebufferDesc desc;
+    desc.addComponent(AttachmentBinding(m_envCubemap, GL_COLOR_ATTACHMENT0));
+    desc.addComponent(AttachmentBinding(depth, GL_DEPTH_ATTACHMENT));
+    m_captureFBO = Framebuffer::Create(desc);
 
     return true;
 }
@@ -136,10 +135,6 @@ bool LightProbe::update()
 
 void LightProbe::destroy()
 {
-    glCreateRenderbuffers(1, &m_captureRBO);
-    glCreateFramebuffers(1, &m_captureFBO);
-    m_captureRBO = 0;
-    m_captureFBO = 0;
 }
 
 LightProbe::~LightProbe()
@@ -168,9 +163,8 @@ void LightProbe::createEnvCube()
     s_equirectangularToCubemapShader.bindTexture("equirectangularMap", s_newportTex, 0);
     s_equirectangularToCubemapShader.setUniform("projection", captureProjection);
 
-    assert(m_captureFBO != 0);
-    assert(m_captureRBO != 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
+    assert(m_captureFBO != nullptr);
+    m_captureFBO->bind();
 
     // don't forget to configure the viewport to the capture dimensions.
     glViewport(0, 0, m_envMapSize, m_envMapSize);

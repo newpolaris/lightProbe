@@ -661,7 +661,7 @@ namespace {
 
 		ImGui::Text("Mesh:");
 		ImGui::Indent();
-		ImGui::RadioButton("Bunny", &m_settings.m_meshSelection, 0);
+		ImGui::RadioButton("Pistol", &m_settings.m_meshSelection, 0);
 		ImGui::RadioButton("Orbs",  &m_settings.m_meshSelection, 1);
 		ImGui::Unindent();
 
@@ -864,8 +864,8 @@ namespace {
         m_lightProbe = std::make_shared<LightProbe>();
         m_lightProbe->initialize();
         {
-        PROFILEGL("Light Probe");
-        m_lightProbe->update();
+            PROFILEGL("Light Probe");
+            m_lightProbe->update();
         }
     }
 

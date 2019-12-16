@@ -1,5 +1,6 @@
 #include <Types.h>
 #include <GL/glew.h>
+#include <string>
 
 enum VertexAttrib
 {

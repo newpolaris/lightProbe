@@ -31,7 +31,7 @@ include_directories(
 	src/
 	external/
 	external/AntTweakBar-1.16/include/
-	external/glfw-3.1.2/include/GLFW/
+	external/glfw-3.3/include/GLFW/
 	external/glm/
 	external/glew-1.13.0/include/
 	external/assimp-3.0.1270/include/

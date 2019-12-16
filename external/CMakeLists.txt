@@ -12,10 +12,10 @@ add_definitions(
 
 ### GLFW ###
 
-add_subdirectory (glfw-3.1.2)
+add_subdirectory (glfw-3.3)
 
 include_directories(
-	glfw-3.1.2/include/
+	glfw-3.3/include/
 	glew-1.13.0/include/
 )
 

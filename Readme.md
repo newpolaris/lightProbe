@@ -1,3 +1,5 @@
+NOTE: Has BUG on prefileter or irraidance in compute shader, has dirty noise
+
 * Use code from [2] for brdf and dynamic cube map
 * Use code from [4] for split sum and pbr related code
 * Use code from [5] for some gl utility
